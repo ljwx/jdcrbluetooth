@@ -8,13 +8,13 @@ import java.util.UUID
 const val MTU_DEFAULT_SIZE = 23
 
 data class JdcrBleScanConfig(
-    val minRssi: Int = -100,
-    val filterNullName: Boolean = true,
-    val expiredTimeMills: Int = 2000,
-    val resultIntervalMills: Long = 200,
-    val rssiSort: Boolean = true,
-    val scanFilters: List<ScanFilter>? = null,
-    val settings: ScanSettings = getDefaultScanSettings(),
+    var minRssi: Int = -100,
+    var filterNullName: Boolean = true,
+    var expiredTimeMills: Int = 2000,
+    var resultIntervalMills: Long = 200,
+    var rssiSort: Boolean = true,
+    var scanFilters: List<ScanFilter>? = null,
+    var settings: ScanSettings = getDefaultScanSettings(),
 ) {
     companion object {
 

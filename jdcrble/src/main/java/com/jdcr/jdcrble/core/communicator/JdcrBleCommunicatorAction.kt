@@ -16,15 +16,15 @@ sealed class JdcrBleCommunicatorAction(open val address: String, val key: String
         @Retention(AnnotationRetention.SOURCE)
         annotation class WriteType
 
-        fun getReadKey(address: String, serviceUUID: UUID?, characterUUID: UUID): String {
+        internal fun getReadKey(address: String, serviceUUID: UUID?, characterUUID: UUID): String {
             return "read_$address=$serviceUUID=$characterUUID"
         }
 
-        fun getWriteKey(address: String, serviceUUID: UUID?, characterUUID: UUID): String {
+        internal fun getWriteKey(address: String, serviceUUID: UUID?, characterUUID: UUID): String {
             return "write_$address=$serviceUUID=$characterUUID"
         }
 
-        fun getEnableNotifyKey(
+        internal fun getEnableNotifyKey(
             address: String,
             serviceUUID: UUID?,
             characterUUID: UUID,

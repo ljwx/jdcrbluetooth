@@ -4,15 +4,42 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 
 object JdcrBlePermissionUtils {
 
-    fun getScanPermission(): String? {
+    private fun getLocationPermissions(): Array<String> {
+        return arrayOf(
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        )
+    }
+
+    private fun getBluetoothPermissions(): Array<String> {
+        return arrayOf(
+            Manifest.permission.BLUETOOTH_SCAN,
+            Manifest.permission.BLUETOOTH_CONNECT,
+//                Manifest.permission.BLUETOOTH_ADVERTISE // 如果需要广播才加
+        )
+    }
+
+    fun getAllPermissions(): Array<String> {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            Manifest.permission.BLUETOOTH_SCAN
+            getBluetoothPermissions()
+        } else {
+            // Android 11- 蓝牙必须的定位权限
+            getLocationPermissions()
+        }
+    }
+
+    fun getScanPermission(): Array<String>? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_SCAN)
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Manifest.permission.ACCESS_FINE_LOCATION
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
         } else {
             null
         }
@@ -29,21 +56,70 @@ object JdcrBlePermissionUtils {
     }
 
     fun checkScanPermission(context: Context): Boolean {
-        getScanPermission()?.let {
-            return ActivityCompat.checkSelfPermission(
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) ==
+                    PackageManager.PERMISSION_GRANTED
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val hasFine = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            val hasCoarse = ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            hasFine || hasCoarse
+        } else {
+            true
+        }
+    }
+
+    fun checkConnectPermission(context: Context): Boolean {
+        getConnectPermission()?.let {
+            return ContextCompat.checkSelfPermission(
                 context, it
             ) == PackageManager.PERMISSION_GRANTED
         }
         return true
     }
 
-    fun checkConnectPermission(context: Context): Boolean {
-        getConnectPermission()?.let {
-            return ActivityCompat.checkSelfPermission(
-                context, it
+    fun getMissPermission(context: Context): Pair<Boolean, List<String>>? {
+        val missingList = mutableListOf<String>()
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // --- Android 12 (API 31) 及以上 ---
+            getBluetoothPermissions().forEach {
+                if (ContextCompat.checkSelfPermission(
+                        context,
+                        it
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    missingList.add(it)
+                }
+            }
+            if (missingList.isEmpty()) {
+                return null
+            } else {
+                return Pair(false, missingList)
+            }
+        } else {
+            // --- Android 11 及以下 ---
+            // 必须有定位权限才能搜到 BLE 设备
+            val hasFine = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
+            val hasCoarse = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (!hasFine && !hasCoarse) {
+                // 通常申请精度高的即可
+                missingList.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                missingList.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                return Pair(true, missingList)
+            }
+            return null
         }
-        return true
     }
 
 }

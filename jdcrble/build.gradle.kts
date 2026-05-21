@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.jdcr.jdcrble"
-    compileSdk = 33
+    compileSdk = 34
 
     defaultConfig {
         minSdk = 24
@@ -42,6 +42,6 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
 
-    api("com.github.ljwx:jdcrlog:1.2.3")
-    api("com.github.ljwx:jdcrpermissions:0.2.0-SNAPSHOT")
+    api("com.github.ljwx:jdcrlog:1.2.5")
+    api("com.github.ljwx:jdcrpermissions:0.3.1-SNAPSHOT")
 }
