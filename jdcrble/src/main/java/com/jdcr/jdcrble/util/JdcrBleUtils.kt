@@ -40,15 +40,15 @@ object JdcrBleUtils {
         return true //有些机型,可能需要定位权限
     }
 
-    fun getBleAvailableState(context: Context): JdcrBleAvailableState {
+    fun getBleAvailableState(
+        context: Context,
+        forceLocationPermission: Boolean
+    ): JdcrBleAvailableState {
         if (!isBleSupport(context)) return JdcrBleAvailableState.BleUnSupport
 
-        val permissionResult = JdcrBlePermissionUtils.getMissPermission(context)
-        if (permissionResult != null) {
-            return JdcrBleAvailableState.MissPermission(
-                permissionResult.first, // 是否为定位权限
-                permissionResult.second // 缺失列表
-            )
+        val permissionResult = JdcrBlePermissionUtils.getMissPermission(context, forceLocationPermission)
+        if (permissionResult.isNotEmpty()) {
+            return JdcrBleAvailableState.MissPermission(permissionResult)
         }
 
         if (isNeedLocationFeature()) {

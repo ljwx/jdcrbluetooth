@@ -45,3 +45,18 @@ dependencies {
     api("com.github.ljwx:jdcrlog:1.2.5")
     api("com.github.ljwx:jdcrpermissions:0.3.1-SNAPSHOT")
 }
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"]) //release debug
+                // JitPack 会自动填充 groupId 和 version，
+                // 但为了本地测试，你可以保留这些：
+                groupId = "com.github.jdcr"
+                artifactId = "bluetooth"
+                version = "1.0.0-SNAPSHOT"
+            }
+        }
+    }
+}

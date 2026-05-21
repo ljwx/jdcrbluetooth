@@ -81,8 +81,54 @@ object JdcrBlePermissionUtils {
         return true
     }
 
-    fun getMissPermission(context: Context): Pair<Boolean, List<String>>? {
+    fun isMissBlePermission(permissions: List<String>): Boolean {
+        permissions.forEach {
+            if (it == Manifest.permission.BLUETOOTH_SCAN) {
+                return true
+            }
+            if (it == Manifest.permission.BLUETOOTH_CONNECT) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fun isMissLocationPermission(permissions: List<String>): Boolean {
+        permissions.forEach {
+            if (it == Manifest.permission.ACCESS_FINE_LOCATION) {
+                return true
+            }
+            if (it == Manifest.permission.ACCESS_COARSE_LOCATION) {
+                return true
+            }
+        }
+        return false
+    }
+
+    fun getMissPermission(
+        context: Context,
+        forceLocationPermission: Boolean = false
+    ): List<String> {
         val missingList = mutableListOf<String>()
+
+        fun location(): List<String> {
+            val locationList = mutableListOf<String>()
+            val hasFine = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+            val hasCoarse = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+
+            if (!hasFine && !hasCoarse) {
+                // 通常申请精度高的即可
+                locationList.add(Manifest.permission.ACCESS_FINE_LOCATION)
+                locationList.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
+            return locationList
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             // --- Android 12 (API 31) 及以上 ---
@@ -95,30 +141,19 @@ object JdcrBlePermissionUtils {
                     missingList.add(it)
                 }
             }
-            if (missingList.isEmpty()) {
-                return null
-            } else {
-                return Pair(false, missingList)
+            if (forceLocationPermission) {
+                missingList.addAll(location())
             }
+            return missingList
         } else {
             // --- Android 11 及以下 ---
             // 必须有定位权限才能搜到 BLE 设备
-            val hasFine = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-            val hasCoarse = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-
-            if (!hasFine && !hasCoarse) {
+            if (location().isNotEmpty()) {
                 // 通常申请精度高的即可
                 missingList.add(Manifest.permission.ACCESS_FINE_LOCATION)
                 missingList.add(Manifest.permission.ACCESS_COARSE_LOCATION)
-                return Pair(true, missingList)
             }
-            return null
+            return missingList
         }
     }
 

@@ -7,8 +7,6 @@ import com.jdcr.jdcrble.core.scanner.ScanResultWrapper
 
 sealed class JdcrBleScanResult(desc: String) {
 
-    object IDLE : JdcrBleScanResult("闲置中")
-
     data class ScanningList(
         val results: List<ScanResultWrapper>,
         val timestamp: Long = System.currentTimeMillis()
@@ -108,8 +106,8 @@ sealed class JdcrBleConnectState(
 
 sealed class JdcrBleAvailableState(val desc: String) {
     object BleUnSupport : JdcrBleAvailableState("不支持蓝牙")
-    data class MissPermission(val isLocation: Boolean, val permission: List<String>) :
-        JdcrBleAvailableState("缺少权限,是否定位权限:$isLocation,权限列表:$permission")
+    data class MissPermission(val permission: List<String>) :
+        JdcrBleAvailableState("缺少权限,权限列表:$permission")
 
     object BleDisable : JdcrBleAvailableState("蓝牙未开启")
     object LocationDisable : JdcrBleAvailableState("定位未开启")

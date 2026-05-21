@@ -31,9 +31,13 @@ class JdcrBleHelper(context: Context) {
     private val locationEnableReceiver by lazy { JdcrBleLocationEnableReceiver(applicationContext) }
 
     private var availableState =
-        MutableStateFlow(JdcrBleUtils.getBleAvailableState(applicationContext))
+        MutableStateFlow(JdcrBleUtils.getBleAvailableState(applicationContext, true))
 
-    private val bleCore by lazy { JdcrBleCore(applicationContext, JdcrBleConfig().apply { connect.mtu = 100 }) }
+    private val bleCore by lazy {
+        JdcrBleCore(
+            applicationContext,
+            JdcrBleConfig().apply { connect.mtu = 100 })
+    }
 
     fun init(): JdcrBleHelper {
         JdcrLog.enable(true)
@@ -50,7 +54,7 @@ class JdcrBleHelper(context: Context) {
     }
 
     fun changeAvailableState() {
-        availableState.value = JdcrBleUtils.getBleAvailableState(applicationContext)
+        availableState.value = JdcrBleUtils.getBleAvailableState(applicationContext, true)
             .apply { "可用状态更新:${this.desc}" }
     }
 
