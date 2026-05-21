@@ -1,11 +1,15 @@
 package com.jdcr.jdcrble.util
 
 import android.bluetooth.BluetoothManager
+import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.location.LocationManager
-import android.os.Build
 import androidx.core.location.LocationManagerCompat
 import com.jdcr.jdcrble.state.JdcrBleAvailableState
+
+internal fun ScanResult.simpleInfo(deviceName: String?): String {
+    return "${if (deviceName == null) "" else "名称:$deviceName,"}地址:${device.address},RSSI:${rssi},}"
+}
 
 object JdcrBleUtils {
 
@@ -32,7 +36,8 @@ object JdcrBleUtils {
     }
 
     fun isNeedLocationFeature(): Boolean {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+//        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+        return true //有些机型,可能需要定位权限
     }
 
     fun getBleAvailableState(context: Context): JdcrBleAvailableState {

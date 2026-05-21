@@ -30,8 +30,8 @@ data class JdcrBleScanConfig(
 }
 
 data class JdcrBleConnectConfig(
-    val maxConnectDevice: Int = 3,
-    val mtu: Int? = null,
+    var maxConnectDevice: Int = 3,
+    var mtu: Int? = null,
     val autoConnect: Boolean = false
 )
 

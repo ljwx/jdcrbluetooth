@@ -33,7 +33,7 @@ class JdcrBleHelper(context: Context) {
     private var availableState =
         MutableStateFlow(JdcrBleUtils.getBleAvailableState(applicationContext))
 
-    private val bleCore by lazy { JdcrBleCore(applicationContext, JdcrBleConfig()) }
+    private val bleCore by lazy { JdcrBleCore(applicationContext, JdcrBleConfig().apply { connect.mtu = 100 }) }
 
     fun init(): JdcrBleHelper {
         JdcrLog.enable(true)
@@ -123,6 +123,22 @@ class JdcrBleHelper(context: Context) {
         }
     }
 
+    fun registerNotification(
+        notification: JdcrBleCommunicatorAction.RegisterNotification,
+        onMainThread: Boolean = false,
+        onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
+    ) {
+        if (JdcrBlePermissionUtils.checkConnectPermission(applicationContext)) {
+            bleCore.sendAction(
+                notification,
+                onMainThread,
+                onComplete
+            )
+        } else {
+            JdcrBleLog.i("没有连接权限,不执行注册通知")
+        }
+    }
+
     fun write(
         write: JdcrBleCommunicatorAction.Write,
         onMainThread: Boolean = false,
@@ -156,6 +172,8 @@ class JdcrBleHelper(context: Context) {
         }
 
     }
+
+    fun getNotificationDataFlow() = bleCore.getNotificationDataFlow()
 
     fun onRelease() {
         bleEnableReceiver.close()

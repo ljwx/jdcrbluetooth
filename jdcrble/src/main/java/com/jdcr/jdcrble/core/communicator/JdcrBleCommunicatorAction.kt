@@ -4,7 +4,11 @@ import android.bluetooth.BluetoothGattCharacteristic
 import androidx.annotation.IntDef
 import java.util.UUID
 
-sealed class JdcrBleCommunicatorAction(open val address: String, val key: String) {
+sealed class JdcrBleCommunicatorAction(
+    open val address: String,
+    val key: String,
+    open val tag: String?
+) {
     companion object {
 
         const val WRITE_TYPE_DEFAULT = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
@@ -38,7 +42,8 @@ sealed class JdcrBleCommunicatorAction(open val address: String, val key: String
         override val address: String,
         val serviceUUID: UUID,
         val characterUUID: UUID,
-    ) : JdcrBleCommunicatorAction(address, getReadKey(address, serviceUUID, characterUUID))
+        override val tag: String? = null,
+    ) : JdcrBleCommunicatorAction(address, getReadKey(address, serviceUUID, characterUUID), tag)
 
     data class Write(
         override val address: String,
@@ -46,7 +51,8 @@ sealed class JdcrBleCommunicatorAction(open val address: String, val key: String
         val characterUUID: UUID,
         val writeData: ByteArray,
         @WriteType val writeType: Int? = null,
-    ) : JdcrBleCommunicatorAction(address, getWriteKey(address, serviceUUID, characterUUID))
+        override val tag: String? = null
+    ) : JdcrBleCommunicatorAction(address, getWriteKey(address, serviceUUID, characterUUID), tag)
 
     data class RegisterNotification(
         override val address: String,
@@ -55,6 +61,7 @@ sealed class JdcrBleCommunicatorAction(open val address: String, val key: String
         val descriptorUUID: UUID = StandardDescriptorUUID,
         val isIndicationValue: Boolean = false,
         val interval: Long = 50,
+        override val tag: String? = null
     ) :
         JdcrBleCommunicatorAction(
             address,
@@ -62,8 +69,8 @@ sealed class JdcrBleCommunicatorAction(open val address: String, val key: String
                 address,
                 serviceUUID,
                 characterUUID,
-                descriptorUUID
-            )
+                descriptorUUID,
+            ), tag
         ) {
         companion object {
             val StandardDescriptorUUID =

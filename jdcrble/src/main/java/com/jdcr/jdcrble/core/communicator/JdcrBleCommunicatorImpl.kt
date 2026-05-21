@@ -92,14 +92,17 @@ class JdcrBleCommunicatorImpl(
                         }
                         val result = when (action) {
                             is JdcrBleCommunicatorAction.Read -> {
+                                JdcrBleLog.i("执行指令,读取:${action.tag},${action.key}")
                                 read(gatt, action)
                             }
 
                             is JdcrBleCommunicatorAction.RegisterNotification -> {
+                                JdcrBleLog.i("执行指令,注册通知:${action.tag},${action.key}")
                                 registerNotification(gatt, action)
                             }
 
                             is JdcrBleCommunicatorAction.Write -> {
+                                JdcrBleLog.i("执行指令,写入:${action.tag},${action.key}")
                                 write(gatt, action)
                             }
                         }
@@ -145,7 +148,7 @@ class JdcrBleCommunicatorImpl(
         inMainThread: Boolean,
         onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
     ) {
-        JdcrBleLog.i("收到指令:${action.key}")
+        JdcrBleLog.i("收到指令:${action.tag},${action.key}")
         initChannel()
         coroutine.launch {
             actionChannel?.send(JdcrBleActionWrapper(action, onComplete, inMainThread))
@@ -172,14 +175,14 @@ class JdcrBleCommunicatorImpl(
     ): Result<JdcrBleCommunicatorActionResult> {
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         if (character == null) {
-            "特征值为空,读取失败:${action}".let {
+            "特征值为空,读取失败:${action.tag},${action.characterUUID}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }
         } else {
             val success = gatt.readCharacteristic(character)
             if (!success) {
-                "请求读取数据操作失败:$action".let {
+                "请求读取数据操作失败:${action.tag},${action.characterUUID}".let {
                     JdcrBleLog.w(it)
                     return Result.failure(JdcrBleCommunicationException(it))
                 }
@@ -222,14 +225,15 @@ class JdcrBleCommunicatorImpl(
                 success
             }
             if (!success) {
-                "请求写入数据操作失败:$action".let {
+                "请求写入数据操作失败:${action.tag},${action.characterUUID}".let {
                     JdcrBleLog.w(it)
                     return Result.failure(JdcrBleCommunicationException(it))
                 }
             }
+            JdcrBleLog.i("写入数据成功:${action.tag},${action.characterUUID}")
             return getActionCancellableCoroutine(action)
         } else {
-            "特征值为空,写入失败:${action}".let {
+            "特征值为空,写入失败:${action.tag},${action.characterUUID}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }
@@ -243,7 +247,7 @@ class JdcrBleCommunicatorImpl(
     ): Result<JdcrBleCommunicatorActionResult> {
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         if (character != null) {
-            JdcrBleLog.i("设置通知特征值:${action.characterUUID}")
+            JdcrBleLog.i("设置通知特征值:${action.tag},${action.characterUUID}")
             gatt.setCharacteristicNotification(character, true)
             val value =
                 if (action.isIndicationValue) BluetoothGattDescriptor.ENABLE_INDICATION_VALUE else BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
@@ -257,21 +261,21 @@ class JdcrBleCommunicatorImpl(
                     gatt.writeDescriptor(descriptor)
                 }
                 if (!writeResult) {
-                    "通知描述符写入指令失败:${action.characterUUID}".let {
+                    "通知描述符写入指令失败:${action.tag},${action.characterUUID}".let {
                         JdcrBleLog.w(it)
                         return Result.failure(JdcrBleCommunicationException(it))
                     }
                 }
-                JdcrBleLog.i("通知描述符写入成功:${action.characterUUID}")
+                JdcrBleLog.i("通知描述符写入成功:${action.tag},${action.characterUUID}")
                 return getActionCancellableCoroutine(action)
             } else {
-                "描述符为空,注册通知失败:${action.descriptorUUID}".let {
+                "描述符为空,注册通知失败:${action.tag},${action.descriptorUUID}".let {
                     JdcrBleLog.w(it)
                     return Result.failure(JdcrBleCommunicationException(it))
                 }
             }
         } else {
-            "特征值为空,注册通知失败:${action.characterUUID}".let {
+            "特征值为空,注册通知失败:${action.tag},${action.characterUUID}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }

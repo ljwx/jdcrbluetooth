@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.coroutines.cancellation.CancellationException
 
 open class JdcrBleScannerImpl(
     private val context: Context,
@@ -37,7 +38,7 @@ open class JdcrBleScannerImpl(
     private var scanTimeoutJob: Job? = null
     private val scanResultSerial = Dispatchers.Default.limitedParallelism(1)
     private var scanResultChannel: Channel<ScanResult>? = null
-    private val scanResultList by lazy { ArrayList<ScanResult>(32) }
+    private val scanResultList by lazy { ArrayList<ScanResultWrapper>(32) }
     private val scanResultFlow = MutableSharedFlow<JdcrBleScanResult>(
         replay = 1,
         extraBufferCapacity = 5,
@@ -67,21 +68,23 @@ open class JdcrBleScannerImpl(
             }
         }
 
-        fun mergeResult(result: ScanResult) {
+        fun mergeResult(result: ScanResult, connectPermission: Boolean) {
             val device = result.device
-            val existsIndex = scanResultList.indexOfFirst { it.device.address == device.address }
+            val existsIndex =
+                scanResultList.indexOfFirst { it.result.device.address == device.address }
             if (result.rssi < scanConfig.minRssi) {
                 if (existsIndex >= 0) {
                     JdcrBleLog.v("扫描结果,信号太弱,移除该设备:${device.address}")
                     scanResultList.removeAt(existsIndex)
                 }
             } else {
+                val deviceName = if (connectPermission) device.name else null
                 if (existsIndex >= 0) {
-                    JdcrBleLog.v("扫描结果,更新该设备:${device.address}")
-                    scanResultList[existsIndex] = result
+                    JdcrBleLog.v("扫描结果,更新该设备:$deviceName,${device.address}")
+                    scanResultList[existsIndex] = ScanResultWrapper(result, deviceName)
                 } else {
-                    JdcrBleLog.v("扫描结果,添加该设备:${device.address}")
-                    scanResultList.add(result)
+                    JdcrBleLog.v("扫描结果,添加该设备:$deviceName,${device.address}")
+                    scanResultList.add(ScanResultWrapper(result, deviceName))
                 }
             }
         }
@@ -92,13 +95,18 @@ open class JdcrBleScannerImpl(
         )
         scanResultChannel = ch
         handleScanResultJob = coroutine.launch(scanResultSerial) {
+            val connectPermission = JdcrBlePermissionUtils.checkConnectPermission(context)
             try {
                 for (result in ch) {
                     if (!isScanning) break
-                    mergeResult(result)
+                    mergeResult(result, connectPermission)
                 }
             } catch (e: Exception) {
-                JdcrBleLog.e("处理扫描结果时异常", e)
+                if (e is CancellationException) {
+                    JdcrBleLog.i("扫描结果处理任务取消")
+                } else {
+                    JdcrBleLog.e("处理扫描结果时异常", e)
+                }
             }
         }
     }
@@ -130,7 +138,12 @@ open class JdcrBleScannerImpl(
             isScanning = true
             scanResultFlow.asSharedFlow()
         }.onFailure {
-            scanFinish(JdcrBleScanResult.Failure(JdcrBleScanResult.Failure.REASON_EXCEPTION, t = it))
+            scanFinish(
+                JdcrBleScanResult.Failure(
+                    JdcrBleScanResult.Failure.REASON_EXCEPTION,
+                    t = it
+                )
+            )
         }
 
     }
@@ -151,7 +164,7 @@ open class JdcrBleScannerImpl(
         scanFinish(state)
     }
 
-    private fun handleResult(): List<ScanResult> {
+    private fun handleResult(): List<ScanResultWrapper> {
         val permission = JdcrBlePermissionUtils.checkConnectPermission(context)
         val copyResult = ArrayList(scanResultList)
         fun clearDevice() {
@@ -159,14 +172,14 @@ open class JdcrBleScannerImpl(
             val iterator = copyResult.iterator()
             while (iterator.hasNext()) {
                 val result = iterator.next()
-                val deviceBootMillis = result.timestampNanos / 1000_000
+                val deviceBootMillis = result.result.timestampNanos / 1000_000
                 val interval = currentBootMillis - deviceBootMillis
                 if (interval > scanConfig.expiredTimeMills) {
                     iterator.remove()
                     continue
                 }
                 if (scanConfig.filterNullName) {
-                    if (permission && result.device.name.isNullOrEmpty()) {
+                    if (permission && result.result.device.name.isNullOrEmpty()) {
                         iterator.remove()
                     }
                 }
@@ -174,12 +187,13 @@ open class JdcrBleScannerImpl(
         }
 
         fun sortByRssi() {
-            copyResult.sortByDescending { it.rssi }
+            copyResult.sortByDescending { it.result.rssi }
         }
         clearDevice()
         if (scanConfig.rssiSort) {
             sortByRssi()
         }
+        JdcrBleLog.i("发送扫描结果:$copyResult")
         return copyResult
     }
 

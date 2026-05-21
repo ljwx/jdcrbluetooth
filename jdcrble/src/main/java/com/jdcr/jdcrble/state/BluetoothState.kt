@@ -3,18 +3,19 @@ package com.jdcr.jdcrble.state
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.le.ScanResult
+import com.jdcr.jdcrble.core.scanner.ScanResultWrapper
 
 sealed class JdcrBleScanResult(desc: String) {
 
     object IDLE : JdcrBleScanResult("闲置中")
 
     data class ScanningList(
-        val results: List<ScanResult>,
+        val results: List<ScanResultWrapper>,
         val timestamp: Long = System.currentTimeMillis()
     ) : JdcrBleScanResult("扫描中,多个结果")
 
     data class ScanningSingle(
-        val result: ScanResult?,
+        val result: ScanResultWrapper,
         val timestamp: Long = System.currentTimeMillis()
     ) : JdcrBleScanResult("扫描中,单个结果")
 
@@ -49,21 +50,21 @@ sealed class JdcrBleConnectState(
         override val gatt: BluetoothGatt,
         val address: String = device.address,
         val timestamp: Long = System.currentTimeMillis(),
-    ) : JdcrBleConnectState(gatt, "连接中:$address", 1)
+    ) : JdcrBleConnectState(gatt, "Connecting,连接中,$address", 1)
 
     data class Connected(
         val device: BluetoothDevice,
         override val gatt: BluetoothGatt,
         val address: String = device.address,
         val timestamp: Long = System.currentTimeMillis()
-    ) : JdcrBleConnectState(gatt, "硬件连接成功$address", 2)
+    ) : JdcrBleConnectState(gatt, "Connected,硬件连接成功,$address", 2)
 
     data class DiscoveredServices(
         val device: BluetoothDevice,
         override val gatt: BluetoothGatt,
         val address: String = device.address,
         val timestamp: Long = System.currentTimeMillis()
-    ) : JdcrBleConnectState(gatt, "服务启动中$address", 3)
+    ) : JdcrBleConnectState(gatt, "DiscoveredServices,服务启动中,$address", 3)
 
     data class ModifyMtu(
         val device: BluetoothDevice,
@@ -71,7 +72,7 @@ sealed class JdcrBleConnectState(
         override val gatt: BluetoothGatt,
         val address: String = device.address,
         val timestamp: Long = System.currentTimeMillis()
-    ) : JdcrBleConnectState(gatt, "修改mtu中$address", 4)
+    ) : JdcrBleConnectState(gatt, "ModifyMtu,修改mtu中,$address", 4)
 
     data class Ready(
         val device: BluetoothDevice,
@@ -79,14 +80,14 @@ sealed class JdcrBleConnectState(
         val address: String = device.address,
         val mtu: Int = 23,
         val timestamp: Long = System.currentTimeMillis()
-    ) : JdcrBleConnectState(gatt, "通信服务已可用$address", 5)
+    ) : JdcrBleConnectState(gatt, "Ready,通信服务已可用,$address", 5)
 
     data class Disconnecting(
         val device: BluetoothDevice,
         override val gatt: BluetoothGatt,
         val address: String = device.address,
         val timestamp: Long = System.currentTimeMillis()
-    ) : JdcrBleConnectState(gatt, "断开连接中$address", -1)
+    ) : JdcrBleConnectState(gatt, "Disconnecting,断开连接中,$address", -1)
 
     data class Disconnected(
         val device: BluetoothDevice,
@@ -95,7 +96,7 @@ sealed class JdcrBleConnectState(
         val status: Int,
         val address: String = device.address,
         val timestamp: Long = System.currentTimeMillis(),
-    ) : JdcrBleConnectState(gatt, "设备已断开$address", -2) {
+    ) : JdcrBleConnectState(gatt, "Disconnected,设备已断开,$address", -2) {
 
         fun isExceptionDisconnect(): Boolean {
             return status != BluetoothGatt.GATT_SUCCESS

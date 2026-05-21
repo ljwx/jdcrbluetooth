@@ -184,7 +184,7 @@ open class JdcrBleConnectorImpl(
                 characteristic ?: return
                 val success = status == BluetoothGatt.GATT_SUCCESS
                 val uuid = characteristic.uuid
-                JdcrBleLog.i("写入服务回调:$success, $uuid")
+                JdcrBleLog.i("写入服务回调:$success, $uuid, $status")
                 val address = gatt.device.address
                 val service = characteristic.service?.uuid
                 val key = JdcrBleCommunicatorAction.getWriteKey(address, service, uuid)
