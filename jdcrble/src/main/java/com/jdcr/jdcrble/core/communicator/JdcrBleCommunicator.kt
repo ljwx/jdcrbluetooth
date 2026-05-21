@@ -10,7 +10,11 @@ interface JdcrBleCommunicator {
         onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
     )
 
+    fun setMaxDataSize(size: Int)
+
     fun getNotificationDataFlow(): SharedFlow<NotificationData>
+
+    fun clearAction(address: String)
 
     fun release()
 

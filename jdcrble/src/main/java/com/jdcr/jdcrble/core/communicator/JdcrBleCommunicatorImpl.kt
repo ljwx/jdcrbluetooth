@@ -8,6 +8,8 @@ import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresPermission
+import com.jdcr.jdcrble.config.MTU_DEFAULT_SIZE
+import com.jdcr.jdcrble.config.MTU_PLACEHOLDER
 import com.jdcr.jdcrble.exception.JdcrBleCommunicationException
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
@@ -48,6 +50,8 @@ class JdcrBleCommunicatorImpl(
         extraBufferCapacity = 30,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
+
+    private var dataMaxSize = MTU_DEFAULT_SIZE - MTU_PLACEHOLDER
 
     private fun initChannel() {
 
@@ -142,6 +146,10 @@ class JdcrBleCommunicatorImpl(
         this.gatts.remove(address)
     }
 
+    override fun setMaxDataSize(size: Int) {
+        this.dataMaxSize = size
+    }
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     override fun sendAction(
         action: JdcrBleCommunicatorAction,
@@ -192,6 +200,48 @@ class JdcrBleCommunicatorImpl(
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private suspend fun writeSingle(
+        character: BluetoothGattCharacteristic,
+        action: JdcrBleCommunicatorAction.Write,
+        gatt: BluetoothGatt,
+        packet: ByteArray
+    ): Result<JdcrBleCommunicatorActionResult> {
+        val properties = character.properties
+        val writeType = action.writeType
+            ?: when {
+                properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0 -> {
+                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+                }
+
+                properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0 -> {
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                }
+
+                else -> {
+                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+                }
+            }
+        val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val status = gatt.writeCharacteristic(character, packet, writeType)
+            val success = status == BluetoothStatusCodes.SUCCESS
+            success
+        } else {
+            character.value = packet
+            character.writeType = writeType
+            val success = gatt.writeCharacteristic(character)
+            success
+        }
+        if (!success) {
+            "请求写入数据操作失败:${action.tag},${action.characterUUID}".let {
+                JdcrBleLog.w(it)
+                return Result.failure(JdcrBleCommunicationException(it))
+            }
+        }
+        JdcrBleLog.i("写入数据完成:${action.tag},${action.characterUUID}")
+        return getActionCancellableCoroutine(action)
+    }
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     private suspend fun write(
         gatt: BluetoothGatt,
         action: JdcrBleCommunicatorAction.Write
@@ -199,39 +249,22 @@ class JdcrBleCommunicatorImpl(
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         val packet = action.writeData
         if (character != null) {
-            val properties = character.properties
-            val writeType = action.writeType
-                ?: when {
-                    properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0 -> {
-                        BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+            if (packet.size > dataMaxSize) {
+                var finalResult: Result<JdcrBleCommunicatorActionResult>? = null
+                packet.toList()
+                    .chunked(dataMaxSize)
+                    .map { it.toByteArray() }.forEachIndexed { index, bytes ->
+                        JdcrBleLog.i("分片写入,$index")
+                        val result = writeSingle(character, action, gatt, bytes)
+                        finalResult = result
+                        if (!result.isSuccess) {
+                            return result
+                        }
                     }
-
-                    properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0 -> {
-                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    }
-
-                    else -> {
-                        BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                    }
-                }
-            val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val status = gatt.writeCharacteristic(character, packet, writeType)
-                val success = status == BluetoothStatusCodes.SUCCESS
-                success
+                return finalResult ?: Result.failure(NullPointerException("分片写入没有结果"))
             } else {
-                character.value = packet
-                character.writeType = writeType
-                val success = gatt.writeCharacteristic(character)
-                success
+                return writeSingle(character, action, gatt, packet)
             }
-            if (!success) {
-                "请求写入数据操作失败:${action.tag},${action.characterUUID}".let {
-                    JdcrBleLog.w(it)
-                    return Result.failure(JdcrBleCommunicationException(it))
-                }
-            }
-            JdcrBleLog.i("写入数据成功:${action.tag},${action.characterUUID}")
-            return getActionCancellableCoroutine(action)
         } else {
             "特征值为空,写入失败:${action.tag},${action.characterUUID}".let {
                 JdcrBleLog.w(it)
@@ -305,6 +338,11 @@ class JdcrBleCommunicatorImpl(
                 }
             }
         }
+    }
+
+    override fun clearAction(address: String) {
+        actionChannel?.close()
+        actionChannel = null
     }
 
     override fun release() {

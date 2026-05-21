@@ -41,7 +41,7 @@ sealed class JdcrBleConnectState(
         const val INITIAL_STATUS = 0
     }
 
-    object Void : JdcrBleConnectState(null, "没有", INITIAL_STATUS)
+    object Void : JdcrBleConnectState(null, "没有记录", INITIAL_STATUS)
 
     data class Connecting(
         val device: BluetoothDevice,

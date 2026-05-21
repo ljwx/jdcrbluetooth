@@ -16,12 +16,14 @@ import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorImpl
 import com.jdcr.jdcrble.core.communicator.NotificationData
 import com.jdcr.jdcrble.config.JdcrBleConnectConfig
+import com.jdcr.jdcrble.config.MTU_PLACEHOLDER
 import com.jdcr.jdcrble.exception.JdcrBleConnectException
 import com.jdcr.jdcrble.state.JdcrBleConnectState
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.util.concurrent.ConcurrentHashMap
 
 open class JdcrBleConnectorImpl(
     private val context: Context,
@@ -31,8 +33,8 @@ open class JdcrBleConnectorImpl(
 ) : JdcrBleConnector {
 
     private val deviceStatusMap =
-        LinkedHashMap<String, MutableStateFlow<JdcrBleConnectState>>()
-    private var currentMtu: Int? = null
+        ConcurrentHashMap<String, MutableStateFlow<JdcrBleConnectState>>()
+    private val currentMtuMap = ConcurrentHashMap<String, Int>()
 
     private fun getGattCallback(): BluetoothGattCallback {
         return object : BluetoothGattCallback() {
@@ -234,11 +236,12 @@ open class JdcrBleConnectorImpl(
                 gatt?.device ?: return
                 val device = gatt.device
                 val address = gatt.device.address
-                currentMtu = mtu
+                currentMtuMap[address] = mtu
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     JdcrBleLog.w("修改mtu失败:$status")
                 }
                 JdcrBleLog.i("实际mtu大小:$mtu")
+                action.setMaxDataSize(mtu - MTU_PLACEHOLDER)
                 changeDeviceState(address, JdcrBleConnectState.Ready(device, gatt))
             }
 
@@ -306,6 +309,10 @@ open class JdcrBleConnectorImpl(
         }
     }
 
+    override fun getFinalMtu(address: String): Int? {
+        return currentMtuMap[address]
+    }
+
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     override fun disconnect(address: String) {
         JdcrBleLog.i("主动断开连接:$address")
@@ -314,6 +321,8 @@ open class JdcrBleConnectorImpl(
             it.gatt?.close()
             action.removeGatt(address)
         }
+        currentMtuMap.remove(address)
+        action.clearAction(address)
     }
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
@@ -347,6 +356,8 @@ open class JdcrBleConnectorImpl(
         if (status is JdcrBleConnectState.Disconnected) {
             deviceStatusMap.remove(address)
             action.removeGatt(address)
+            currentMtuMap.remove(address)
+            action.clearAction(address)
         }
     }
 

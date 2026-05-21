@@ -6,6 +6,7 @@ import android.os.ParcelUuid
 import java.util.UUID
 
 const val MTU_DEFAULT_SIZE = 23
+const val MTU_PLACEHOLDER = 3
 
 data class JdcrBleScanConfig(
     var minRssi: Int = -100,

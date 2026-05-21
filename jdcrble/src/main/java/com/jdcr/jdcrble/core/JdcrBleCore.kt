@@ -125,6 +125,8 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
         return connector.connect(device)
     }
 
+    override fun getFinalMtu(address: String): Int? = connector?.getFinalMtu(address)
+
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     override fun disconnect(address: String) {
         connector?.disconnect(address)
