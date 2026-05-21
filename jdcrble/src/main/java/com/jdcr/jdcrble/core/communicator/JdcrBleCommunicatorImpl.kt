@@ -146,7 +146,7 @@ class JdcrBleCommunicatorImpl(
         this.gatts.remove(address)
     }
 
-    override fun setMaxDataSize(size: Int) {
+    fun setMaxDataSize(size: Int) {
         this.dataMaxSize = size
     }
 
@@ -340,7 +340,7 @@ class JdcrBleCommunicatorImpl(
         }
     }
 
-    override fun clearAction(address: String) {
+    fun clearAction(address: String) {
         actionChannel?.close()
         actionChannel = null
     }
