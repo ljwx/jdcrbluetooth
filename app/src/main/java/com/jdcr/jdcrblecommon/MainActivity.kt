@@ -15,8 +15,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
-import com.jdcr.jdcrblecommon.selftest.BluetoothDeviceTest
-import com.jdcr.jdcrblecommon.selftest.MicrobitConstants
+import com.jdcr.jdcrblecommon.selftest.BluetoothDeviceTudaoTest
+import com.jdcr.jdcrblecommon.selftest.TudaoConstants
 import com.jdcr.jdcrblecommon.ui.theme.JdcrBleCommonTheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -25,8 +25,8 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val address = MicrobitConstants.TEST_ADDRESS
-        val helper = BluetoothDeviceTest
+        val address = TudaoConstants.TEST_ADDRESS
+        val helper = BluetoothDeviceTudaoTest
         helper.init(this)
         var scanJob: Job? = null
         setContent {
@@ -100,14 +100,19 @@ class MainActivity : FragmentActivity() {
                             Text(text = "断开连接")
                         }
                         Button(onClick = {
-                            helper.readTemperature(address)
+                            helper.motorDualForward(address)
                         }) {
-                            Text(text = "读取温度")
+                            Text(text = "双轮前进")
                         }
                         Button(onClick = {
-                            helper.writeTextToLed(address)
+                            helper.motorForward(address)
                         }) {
-                            Text(text = "写入文案")
+                            Text(text = "M1 正转")
+                        }
+                        Button(onClick = {
+                            helper.stopMotor(address)
+                        }) {
+                            Text(text = "停止电机")
                         }
                     }
                 }

@@ -286,8 +286,8 @@ object BluetoothDeviceTest {
                 address,
                 MicrobitConstants.LED_SERVICE_UUID.toUUID(),
                 MicrobitConstants.LED_TEXT_UUID.toUUID(),
-//                "a---b---c---d---e---0123".toByteArray(),
-                "1".toByteArray(),
+                "a---b---c---d---e---0123".toByteArray(),
+//                "1".toByteArray(),
                 tag = "写入LED",
             )
         ) {
