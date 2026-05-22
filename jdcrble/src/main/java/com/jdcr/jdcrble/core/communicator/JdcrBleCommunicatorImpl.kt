@@ -181,10 +181,10 @@ class JdcrBleCommunicatorImpl(
         val channel = actionChannelMap[action.address]
         if (channel?.isClosedForSend == false) {
             if (channel.trySend(JdcrBleActionWrapper(action, onComplete, inMainThread)).isFailure) {
-                onComplete?.invoke(Result.failure(JdcrBleCommunicationException("通信通道还未建立")))
+                onComplete?.invoke(Result.failure(JdcrBleCommunicationException("通信错误,可能通道未建立")))
             }
         } else {
-            onComplete?.invoke(Result.failure(JdcrBleCommunicationException("设备已断连,无法执行")))
+            onComplete?.invoke(Result.failure(JdcrBleCommunicationException("通信异常,可能已断连")))
         }
     }
 
