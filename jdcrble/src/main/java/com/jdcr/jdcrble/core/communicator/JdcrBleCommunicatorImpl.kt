@@ -8,8 +8,10 @@ import android.bluetooth.BluetoothStatusCodes
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresPermission
+import com.jdcr.jdcrble.config.BleCommunicateConfig
 import com.jdcr.jdcrble.config.MTU_DEFAULT_SIZE
 import com.jdcr.jdcrble.config.MTU_PLACEHOLDER
+import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction.Companion.WRITE_TYPE_NO_RESPONSE
 import com.jdcr.jdcrble.exception.JdcrBleCommunicationException
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
@@ -18,12 +20,16 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeoutException
+import kotlin.coroutines.cancellation.CancellationException
 
 data class JdcrBleActionWrapper(
     val action: JdcrBleCommunicatorAction,
@@ -33,6 +39,7 @@ data class JdcrBleActionWrapper(
 
 class JdcrBleCommunicatorImpl(
     private val context: Context,
+    private val config: BleCommunicateConfig,
     private val coroutine: CoroutineScope
 ) : JdcrBleCommunicator {
 
@@ -40,8 +47,7 @@ class JdcrBleCommunicatorImpl(
 
     private var actionChannelMap = ConcurrentHashMap<String, Channel<JdcrBleActionWrapper>>()
 
-    @Volatile
-    private var currentAction: JdcrBleCommunicatorAction? = null
+    private var currentActionMap = ConcurrentHashMap<String, JdcrBleCommunicatorAction>()
     private val pendingActions =
         ConcurrentHashMap<String, CancellableContinuation<Result<JdcrBleCommunicatorActionResult>>>()
 
@@ -51,7 +57,7 @@ class JdcrBleCommunicatorImpl(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
-    private var dataMaxSize = MTU_DEFAULT_SIZE - MTU_PLACEHOLDER
+    private val dataMaxSizeMap = ConcurrentHashMap<String, Int>()
 
     private fun initChannel(address: String) {
 
@@ -81,12 +87,13 @@ class JdcrBleCommunicatorImpl(
                 try {
                     for (wrapper in channel) {
                         val action = wrapper.action
-                        val address = action.address
-                        currentAction = action
-                        val gatt = this@JdcrBleCommunicatorImpl.gatts[address]
+                        val actionAddress = action.address
+                        currentActionMap[actionAddress] = action
+                        val gatt = this@JdcrBleCommunicatorImpl.gatts[actionAddress]
                         if (gatt == null) {
-                            "gatt为空,无法执行通讯:$address".let {
+                            "gatt为空,无法执行通讯:$actionAddress".let {
                                 JdcrBleLog.w(it)
+                                currentActionMap.remove(actionAddress)
                                 resultComplete(
                                     wrapper,
                                     Result.failure(JdcrBleCommunicationException(it))
@@ -94,24 +101,36 @@ class JdcrBleCommunicatorImpl(
                             }
                             continue
                         }
-                        val result = when (action) {
+                        val result: Result<JdcrBleCommunicatorActionResult> = when (action) {
                             is JdcrBleCommunicatorAction.Read -> {
-                                JdcrBleLog.i("执行指令,读取:${action.tag},${action.key}")
-                                read(gatt, action)
+                                val result = withTimeoutOrNull(config.timeoutMills) {
+                                    JdcrBleLog.i("执行指令,${action.log}")
+                                    read(gatt, action)
+                                }
+                                result ?: Result.failure(TimeoutException("命令结果超时"))
                             }
 
                             is JdcrBleCommunicatorAction.RegisterNotification -> {
-                                JdcrBleLog.i("执行指令,注册通知:${action.tag},${action.key}")
-                                registerNotification(gatt, action)
+                                val result = withTimeoutOrNull(config.timeoutMills) {
+                                    JdcrBleLog.i("执行指令,${action.log}")
+                                    registerNotification(gatt, action)
+                                }
+                                result ?: Result.failure(TimeoutException("命令结果超时"))
                             }
 
                             is JdcrBleCommunicatorAction.Write -> {
-                                JdcrBleLog.i("执行指令,写入:${action.tag},${action.key}")
-                                write(gatt, action)
+                                val result = withTimeoutOrNull(config.timeoutMills) {
+                                    JdcrBleLog.i("执行指令,${action.log}")
+                                    write(gatt, action)
+                                }
+                                result ?: Result.failure(TimeoutException("命令结果超时"))
                             }
                         }
+                        currentActionMap.remove(actionAddress)
                         resultComplete(wrapper, result)
                     }
+                } catch (e: CancellationException) {
+                    JdcrBleLog.w("通信已关闭,${address}")
                 } catch (e: Exception) {
                     JdcrBleLog.e("执行通信出现异常", e)
                 }
@@ -124,16 +143,17 @@ class JdcrBleCommunicatorImpl(
             JdcrBleLog.w("没有蓝牙连接权限,无法执行通信操作")
             return
         }
-        var actionChannel = actionChannelMap[address]
-        if (actionChannel == null) {
+        if (actionChannelMap[address] == null) {
             synchronized(this) {
-                val channel: Channel<JdcrBleActionWrapper> = Channel(
-                    capacity = 150,
-                    onBufferOverflow = BufferOverflow.DROP_OLDEST
-                )
-                actionChannelMap[address] = channel
-                JdcrBleLog.i("创建通信通道:$address")
-                looper(channel)
+                if (actionChannelMap[address] == null) {
+                    val channel: Channel<JdcrBleActionWrapper> = Channel(
+                        capacity = 256,
+                        onBufferOverflow = BufferOverflow.DROP_OLDEST
+                    )
+                    actionChannelMap[address] = channel
+                    JdcrBleLog.i("创建通信通道:$address")
+                    looper(channel)
+                }
             }
         }
     }
@@ -146,8 +166,8 @@ class JdcrBleCommunicatorImpl(
         this.gatts.remove(address)
     }
 
-    fun setMaxDataSize(size: Int) {
-        this.dataMaxSize = size
+    fun setMaxDataSize(address: String, size: Int) {
+        dataMaxSizeMap[address] = size
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -156,17 +176,20 @@ class JdcrBleCommunicatorImpl(
         inMainThread: Boolean,
         onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
     ) {
-        JdcrBleLog.i("收到指令:${action.tag},${action.key}")
+        JdcrBleLog.i("收到指令:${action.log}")
         initChannel(action.address)
-        coroutine.launch {
-            actionChannelMap[action.address]?.send(
-                JdcrBleActionWrapper(action, onComplete, inMainThread)
-            )
+        val channel = actionChannelMap[action.address]
+        if (channel?.isClosedForSend == false) {
+            if (channel.trySend(JdcrBleActionWrapper(action, onComplete, inMainThread)).isFailure) {
+                onComplete?.invoke(Result.failure(JdcrBleCommunicationException("通信通道还未建立")))
+            }
+        } else {
+            onComplete?.invoke(Result.failure(JdcrBleCommunicationException("设备已断连,无法执行")))
         }
     }
 
-    internal fun getCurrentAction(): JdcrBleCommunicatorAction? {
-        return currentAction
+    internal fun getCurrentAction(address: String): JdcrBleCommunicatorAction? {
+        return currentActionMap[address]
     }
 
     private suspend fun getActionCancellableCoroutine(action: JdcrBleCommunicatorAction): Result<JdcrBleCommunicatorActionResult> {
@@ -185,14 +208,14 @@ class JdcrBleCommunicatorImpl(
     ): Result<JdcrBleCommunicatorActionResult> {
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         if (character == null) {
-            "特征值为空,读取失败:${action.tag},${action.characterUUID}".let {
+            "特征值为空,读取失败:${action.log}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }
         } else {
             val success = gatt.readCharacteristic(character)
             if (!success) {
-                "请求读取数据操作失败:${action.tag},${action.characterUUID}".let {
+                "请求读取数据操作失败:${action.log}".let {
                     JdcrBleLog.w(it)
                     return Result.failure(JdcrBleCommunicationException(it))
                 }
@@ -208,21 +231,21 @@ class JdcrBleCommunicatorImpl(
         gatt: BluetoothGatt,
         packet: ByteArray
     ): Result<JdcrBleCommunicatorActionResult> {
-        val properties = character.properties
         val writeType = action.writeType
-            ?: when {
-                properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0 -> {
-                    BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-                }
-
-                properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0 -> {
-                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                }
-
-                else -> {
-                    BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
-                }
-            }
+//        val properties = character.properties
+//        when {
+//            properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0 -> {
+//                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
+//            }
+//
+//            properties and BluetoothGattCharacteristic.PROPERTY_WRITE != 0 -> {
+//                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+//            }
+//
+//            else -> {
+//                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
+//            }
+//        }
         val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val status = gatt.writeCharacteristic(character, packet, writeType)
             val success = status == BluetoothStatusCodes.SUCCESS
@@ -233,14 +256,25 @@ class JdcrBleCommunicatorImpl(
             val success = gatt.writeCharacteristic(character)
             success
         }
+        delay(30)
         if (!success) {
-            "请求写入数据操作失败:${action.tag},${action.characterUUID}".let {
+            "请求写入数据操作失败:${action.log}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }
         }
-        JdcrBleLog.i("写入数据完成:${action.tag},${action.characterUUID}")
-        return getActionCancellableCoroutine(action)
+        JdcrBleLog.i("写入数据完成:${action.log}")
+        return if (action.writeType == WRITE_TYPE_NO_RESPONSE) Result.success(
+            JdcrBleCommunicatorActionResult.Write(
+                action.address,
+                action.serviceUUID,
+                action.characterUUID,
+                action.tag
+            )
+        )
+            .apply { JdcrBleLog.i("写入类型不需要响应,直接返回成功") } else getActionCancellableCoroutine(
+            action
+        )
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
@@ -251,6 +285,7 @@ class JdcrBleCommunicatorImpl(
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         val packet = action.writeData
         if (character != null) {
+            val dataMaxSize = dataMaxSizeMap[action.address] ?: (MTU_DEFAULT_SIZE - MTU_PLACEHOLDER)
             if (packet.size > dataMaxSize) {
                 var finalResult: Result<JdcrBleCommunicatorActionResult>? = null
                 packet.toList()
@@ -268,7 +303,7 @@ class JdcrBleCommunicatorImpl(
                 return writeSingle(character, action, gatt, packet)
             }
         } else {
-            "特征值为空,写入失败:${action.tag},${action.characterUUID}".let {
+            "特征值为空,写入失败:${action.log}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }
@@ -282,7 +317,7 @@ class JdcrBleCommunicatorImpl(
     ): Result<JdcrBleCommunicatorActionResult> {
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         if (character != null) {
-            JdcrBleLog.i("设置通知特征值:${action.tag},${action.characterUUID}")
+            JdcrBleLog.i("设置特征值:${action.log}")
             gatt.setCharacteristicNotification(character, true)
             val value =
                 if (action.isIndicationValue) BluetoothGattDescriptor.ENABLE_INDICATION_VALUE else BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
@@ -296,21 +331,20 @@ class JdcrBleCommunicatorImpl(
                     gatt.writeDescriptor(descriptor)
                 }
                 if (!writeResult) {
-                    "通知描述符写入指令失败:${action.tag},${action.characterUUID}".let {
+                    "通知描述符写入指令失败:${action.log}".let {
                         JdcrBleLog.w(it)
                         return Result.failure(JdcrBleCommunicationException(it))
                     }
                 }
-                JdcrBleLog.i("通知描述符写入成功:${action.tag},${action.characterUUID}")
                 return getActionCancellableCoroutine(action)
             } else {
-                "描述符为空,注册通知失败:${action.tag},${action.descriptorUUID}".let {
+                "描述符为空,注册失败:${action.log}".let {
                     JdcrBleLog.w(it)
                     return Result.failure(JdcrBleCommunicationException(it))
                 }
             }
         } else {
-            "特征值为空,注册通知失败:${action.tag},${action.characterUUID}".let {
+            "特征值为空,注册失败:${action.log}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }
@@ -332,9 +366,10 @@ class JdcrBleCommunicatorImpl(
     ) {
         pendingActions.remove(key)?.apply {
             if (success) {
+                JdcrBleLog.i("通信结果成功,${actionResult.log},$key")
                 resume(Result.success(actionResult), null)
             } else {
-                "蓝牙服务回调返回失败:$key".let {
+                "蓝牙服务回调返回失败:${actionResult.log},$key".let {
                     JdcrBleLog.w(it)
                     resume(Result.failure(JdcrBleCommunicationException(it)), null)
                 }
@@ -342,14 +377,27 @@ class JdcrBleCommunicatorImpl(
         }
     }
 
-    fun clearAction(address: String) {
+    fun deviceDisconnected(address: String) {
         actionChannelMap[address]?.close()
         actionChannelMap.remove(address)
+        currentActionMap.remove(address)
+        dataMaxSizeMap.remove(address)
+        pendingActions.iterator().apply {
+            while (hasNext()) {
+                val action = next()
+                if (action.key.contains(address, true)) {
+                    action.value.cancel()
+                    remove()
+                }
+            }
+        }
     }
 
     override fun release() {
         JdcrBleLog.w("通信资源释放")
         gatts.clear()
+        currentActionMap.clear()
+        dataMaxSizeMap.clear()
         actionChannelMap.iterator().apply {
             while (hasNext()) {
                 next().value.close()

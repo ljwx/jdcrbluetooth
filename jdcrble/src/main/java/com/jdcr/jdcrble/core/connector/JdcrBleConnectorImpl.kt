@@ -124,10 +124,9 @@ open class JdcrBleConnectorImpl(
                 val uuid = characteristic.uuid
                 val success = status == BluetoothGatt.GATT_SUCCESS
                 val descriptorUUID = descriptor.uuid
-                val currentAction = action.getCurrentAction()
+                val address = gatt.device?.address ?: return
+                val currentAction = action.getCurrentAction(address)
                 if (currentAction is JdcrBleCommunicatorAction.RegisterNotification && descriptorUUID == currentAction.descriptorUUID) {
-                    JdcrBleLog.i("开启通知服务回调:$success, $uuid")
-                    val address = gatt.device.address
                     val service = characteristic.service?.uuid
                     val key = JdcrBleCommunicatorAction.getEnableNotifyKey(
                         address,
@@ -139,7 +138,8 @@ open class JdcrBleConnectorImpl(
                         address,
                         service,
                         uuid,
-                        descriptor.uuid
+                        descriptor.uuid,
+                        currentAction.tag
                     )
                     action.onActionResult(success, key, result)
                 }
@@ -186,11 +186,15 @@ open class JdcrBleConnectorImpl(
                 characteristic ?: return
                 val success = status == BluetoothGatt.GATT_SUCCESS
                 val uuid = characteristic.uuid
-                JdcrBleLog.i("写入服务回调:$success, $uuid, $status")
                 val address = gatt.device.address
                 val service = characteristic.service?.uuid
                 val key = JdcrBleCommunicatorAction.getWriteKey(address, service, uuid)
-                val result = JdcrBleCommunicatorActionResult.Write(address, service, uuid)
+                val result = JdcrBleCommunicatorActionResult.Write(
+                    address,
+                    service,
+                    uuid,
+                    action.getCurrentAction(address)?.tag
+                )
                 action.onActionResult(success, key, result)
             }
 
@@ -202,11 +206,16 @@ open class JdcrBleConnectorImpl(
             ) {
                 val uuid = characteristic.uuid
                 val success = status == BluetoothGatt.GATT_SUCCESS
-                JdcrBleLog.i("读取服务回调:$success, $uuid")
                 val address = gatt.device.address
                 val service = characteristic.service?.uuid
                 val key = JdcrBleCommunicatorAction.getReadKey(address, service, uuid)
-                val result = JdcrBleCommunicatorActionResult.Read(address, service, uuid, value)
+                val result = JdcrBleCommunicatorActionResult.Read(
+                    address,
+                    service,
+                    uuid,
+                    value,
+                    action.getCurrentAction(address)?.tag
+                )
                 action.onActionResult(success, key, result)
             }
 
@@ -241,7 +250,7 @@ open class JdcrBleConnectorImpl(
                     JdcrBleLog.w("修改mtu失败:$status")
                 }
                 JdcrBleLog.i("实际mtu大小:$mtu")
-                action.setMaxDataSize(mtu - MTU_PLACEHOLDER)
+                action.setMaxDataSize(address, mtu - MTU_PLACEHOLDER)
                 changeDeviceState(address, JdcrBleConnectState.Ready(device, gatt))
             }
 
@@ -322,7 +331,7 @@ open class JdcrBleConnectorImpl(
             action.removeGatt(address)
         }
         currentMtuMap.remove(address)
-        action.clearAction(address)
+        action.deviceDisconnected(address)
     }
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
@@ -357,7 +366,7 @@ open class JdcrBleConnectorImpl(
             deviceStatusMap.remove(address)
             action.removeGatt(address)
             currentMtuMap.remove(address)
-            action.clearAction(address)
+            action.deviceDisconnected(address)
         }
     }
 

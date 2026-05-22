@@ -39,7 +39,13 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
         CoroutineScope(Dispatchers.IO + rootJob + coroutineExceptionHandler)
 
     private var scanner: JdcrBleScannerImpl? = null
-    private val communicator by lazy { JdcrBleCommunicatorImpl(context, coroutine) }
+    private val communicator by lazy {
+        JdcrBleCommunicatorImpl(
+            context,
+            config.communicate,
+            coroutine
+        )
+    }
     private var connector: JdcrBleConnectorImpl? = null
 
     private fun initAdapter(): BluetoothAdapter? {

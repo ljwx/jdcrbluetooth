@@ -7,7 +7,9 @@ import java.util.UUID
 sealed class JdcrBleCommunicatorAction(
     open val address: String,
     val key: String,
-    open val tag: String?
+    val desc: String,
+    open val tag: String?,
+    val log: String = "$desc,$tag,$key",
 ) {
     companion object {
 
@@ -43,16 +45,26 @@ sealed class JdcrBleCommunicatorAction(
         val serviceUUID: UUID,
         val characterUUID: UUID,
         override val tag: String? = null,
-    ) : JdcrBleCommunicatorAction(address, getReadKey(address, serviceUUID, characterUUID), tag)
+    ) : JdcrBleCommunicatorAction(
+        address,
+        getReadKey(address, serviceUUID, characterUUID),
+        "读数据",
+        tag
+    )
 
     data class Write(
         override val address: String,
         val serviceUUID: UUID,
         val characterUUID: UUID,
         val writeData: ByteArray,
-        @WriteType val writeType: Int? = null,
+        @WriteType val writeType: Int = WRITE_TYPE_NO_RESPONSE,
         override val tag: String? = null
-    ) : JdcrBleCommunicatorAction(address, getWriteKey(address, serviceUUID, characterUUID), tag)
+    ) : JdcrBleCommunicatorAction(
+        address,
+        getWriteKey(address, serviceUUID, characterUUID),
+        "写数据",
+        tag
+    )
 
     data class RegisterNotification(
         override val address: String,
@@ -70,7 +82,7 @@ sealed class JdcrBleCommunicatorAction(
                 serviceUUID,
                 characterUUID,
                 descriptorUUID,
-            ), tag
+            ), "订通知", tag
         ) {
         companion object {
             val StandardDescriptorUUID =
@@ -79,30 +91,37 @@ sealed class JdcrBleCommunicatorAction(
     }
 }
 
-sealed class JdcrBleCommunicatorActionResult {
+sealed class JdcrBleCommunicatorActionResult(
+    val desc: String,
+    open val tag: String?,
+    val log: String = "$desc,$tag",
+) {
 
     data class Notification(
         val address: String,
         val serviceUUID: UUID?,
         val characterUUID: UUID,
         val descriptorUUID: UUID,
+        override val tag: String?
     ) :
-        JdcrBleCommunicatorActionResult()
+        JdcrBleCommunicatorActionResult("开启通知", tag)
 
     data class Read(
         val address: String,
         val serviceUUID: UUID?,
         val characterUUID: UUID,
-        val result: ByteArray?
+        val result: ByteArray?,
+        override val tag: String?
     ) :
-        JdcrBleCommunicatorActionResult()
+        JdcrBleCommunicatorActionResult("读取数据", tag)
 
     data class Write(
         val address: String,
         val serviceUUID: UUID?,
         val characterUUID: UUID,
+        override val tag: String?
     ) :
-        JdcrBleCommunicatorActionResult()
+        JdcrBleCommunicatorActionResult("写入数据", tag)
 
 }
 

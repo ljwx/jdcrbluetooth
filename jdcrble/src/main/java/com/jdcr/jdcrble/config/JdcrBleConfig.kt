@@ -36,7 +36,7 @@ data class JdcrBleConnectConfig(
     val autoConnect: Boolean = false
 )
 
-data class BleCommunicateConfig(val timeoutMills: Long = 5000)
+data class BleCommunicateConfig(val timeoutMills: Long = 7000)
 
 data class JdcrBleConfig(
     val scan: JdcrBleScanConfig = JdcrBleScanConfig(),
