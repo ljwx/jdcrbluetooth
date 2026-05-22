@@ -38,7 +38,7 @@ class JdcrBleCommunicatorImpl(
 
     private val gatts = ConcurrentHashMap<String, BluetoothGatt>()
 
-    private var actionChannel: Channel<JdcrBleActionWrapper>? = null
+    private var actionChannelMap = ConcurrentHashMap<String, Channel<JdcrBleActionWrapper>>()
 
     @Volatile
     private var currentAction: JdcrBleCommunicatorAction? = null
@@ -47,13 +47,13 @@ class JdcrBleCommunicatorImpl(
 
     private val notification = MutableSharedFlow<NotificationData>(
         replay = 0,
-        extraBufferCapacity = 30,
+        extraBufferCapacity = 512,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
     private var dataMaxSize = MTU_DEFAULT_SIZE - MTU_PLACEHOLDER
 
-    private fun initChannel() {
+    private fun initChannel(address: String) {
 
         fun resultComplete(
             wrapper: JdcrBleActionWrapper,
@@ -124,16 +124,16 @@ class JdcrBleCommunicatorImpl(
             JdcrBleLog.w("没有蓝牙连接权限,无法执行通信操作")
             return
         }
+        var actionChannel = actionChannelMap[address]
         if (actionChannel == null) {
             synchronized(this) {
-                if (actionChannel == null) {
-                    val channel: Channel<JdcrBleActionWrapper> = Channel(
-                        capacity = 150,
-                        onBufferOverflow = BufferOverflow.DROP_OLDEST
-                    )
-                    actionChannel = channel
-                    looper(channel)
-                }
+                val channel: Channel<JdcrBleActionWrapper> = Channel(
+                    capacity = 150,
+                    onBufferOverflow = BufferOverflow.DROP_OLDEST
+                )
+                actionChannelMap[address] = channel
+                JdcrBleLog.i("创建通信通道:$address")
+                looper(channel)
             }
         }
     }
@@ -157,9 +157,11 @@ class JdcrBleCommunicatorImpl(
         onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
     ) {
         JdcrBleLog.i("收到指令:${action.tag},${action.key}")
-        initChannel()
+        initChannel(action.address)
         coroutine.launch {
-            actionChannel?.send(JdcrBleActionWrapper(action, onComplete, inMainThread))
+            actionChannelMap[action.address]?.send(
+                JdcrBleActionWrapper(action, onComplete, inMainThread)
+            )
         }
     }
 
@@ -341,15 +343,19 @@ class JdcrBleCommunicatorImpl(
     }
 
     fun clearAction(address: String) {
-        actionChannel?.close()
-        actionChannel = null
+        actionChannelMap[address]?.close()
+        actionChannelMap.remove(address)
     }
 
     override fun release() {
         JdcrBleLog.w("通信资源释放")
         gatts.clear()
-        actionChannel?.close()
-        actionChannel = null
+        actionChannelMap.iterator().apply {
+            while (hasNext()) {
+                next().value.close()
+                remove()
+            }
+        }
         pendingActions.iterator().apply {
             while (hasNext()) {
                 next().value.cancel()
