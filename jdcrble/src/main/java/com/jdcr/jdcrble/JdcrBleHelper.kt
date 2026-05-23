@@ -56,8 +56,12 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
             .apply { "可用状态更新:${this.desc}" }
     }
 
-    fun getAvailableState(): MutableStateFlow<JdcrBleAvailableState> {
+    fun getAvailableStateFlow(): MutableStateFlow<JdcrBleAvailableState> {
         return availableState
+    }
+
+    fun getAvailableState(): JdcrBleAvailableState {
+        return availableState.value
     }
 
     fun isBleReady(): Boolean {
