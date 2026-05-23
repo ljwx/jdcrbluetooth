@@ -25,7 +25,7 @@ object BluetoothDeviceTest {
     fun init(context: Context) {
         manager = JdcrBleHelper(context).init()
         scop.launch {
-            manager.getAvailableState().collect {
+            manager.getAvailableStateFlow().collect {
                 JdcrBleLog.i("蓝牙状态:$it")
             }
         }

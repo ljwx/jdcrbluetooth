@@ -29,16 +29,21 @@ class JdcrBleEnableReceiver(context: Context) :
         this.listener = listener
         if (!isRegistered) {
             JdcrBleLog.i("注册蓝牙开关广播")
-            isRegistered = true
             val filter = IntentFilter(BluetoothAdapter.ACTION_STATE_CHANGED)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                applicationContext.registerReceiver(
-                    this,
-                    filter,
-                    Context.RECEIVER_NOT_EXPORTED
-                )
-            } else {
-                applicationContext.registerReceiver(this, filter)
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    applicationContext.registerReceiver(
+                        this,
+                        filter,
+                        // 蓝牙状态广播来自系统蓝牙进程,使用 EXPORTED 才能稳定接收
+                        Context.RECEIVER_EXPORTED
+                    )
+                } else {
+                    applicationContext.registerReceiver(this, filter)
+                }
+                isRegistered = true
+            }.onFailure {
+                JdcrBleLog.e("注册蓝牙开关广播失败", it)
             }
         } else {
             JdcrBleLog.i("蓝牙开关广播已经注册，不执行重复注册")

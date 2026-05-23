@@ -29,19 +29,24 @@ class JdcrBleLocationEnableReceiver(context: Context) :
         this.listener = listener
         if (!isRegistered) {
             JdcrBleLog.i("注册定位开关广播")
-            isRegistered = true
             val intentFilter = IntentFilter().apply {
                 addAction(LocationManager.MODE_CHANGED_ACTION)
                 addAction(LocationManager.PROVIDERS_CHANGED_ACTION)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                applicationContext.registerReceiver(
-                    this,
-                    intentFilter,
-                    Context.RECEIVER_NOT_EXPORTED
-                )
-            } else {
-                applicationContext.registerReceiver(this, intentFilter)
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    applicationContext.registerReceiver(
+                        this,
+                        intentFilter,
+                        // 系统定位开关广播来自系统进程,使用 EXPORTED 更稳妥
+                        Context.RECEIVER_EXPORTED
+                    )
+                } else {
+                    applicationContext.registerReceiver(this, intentFilter)
+                }
+                isRegistered = true
+            }.onFailure {
+                JdcrBleLog.e("注册定位开关广播失败", it)
             }
         } else {
             JdcrBleLog.i("定位广播已经注册，不执行重复注册")
@@ -66,8 +71,7 @@ class JdcrBleLocationEnableReceiver(context: Context) :
 
     override fun onReceive(context: Context?, intent: Intent) {
         if (intent.action == LocationManager.MODE_CHANGED_ACTION || intent.action == LocationManager.PROVIDERS_CHANGED_ACTION) {
-            context ?: return
-            val isLocationEnable = JdcrBleUtils.isLocationEnable(context)
+            val isLocationEnable = JdcrBleUtils.isLocationEnable(applicationContext)
             JdcrBleLog.i("定位开关变化,是否开启:$isLocationEnable")
             callListener(isLocationEnable)
         }
