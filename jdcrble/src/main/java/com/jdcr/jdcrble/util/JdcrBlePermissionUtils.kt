@@ -94,7 +94,7 @@ object JdcrBlePermissionUtils {
         return false
     }
 
-    fun isMissLocationPermission(forceFineLocation: Boolean, permissions: List<String>): Boolean {
+    fun isMissLocationPermission(forceFineLocation: Boolean, permissions: Array<String>): Boolean {
         permissions.forEach {
             if (it == Manifest.permission.ACCESS_FINE_LOCATION) {
                 return true
