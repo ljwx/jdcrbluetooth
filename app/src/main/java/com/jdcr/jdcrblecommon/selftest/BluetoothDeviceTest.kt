@@ -155,11 +155,12 @@ object BluetoothDeviceTest {
     fun disconnect(address: String) = manager.disconnect(address)
 
     fun registerButton(address: String) {
-        manager.registerNotification(
-            JdcrBleCommunicatorAction.RegisterNotification(
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
                 address,
                 MicrobitConstants.BUTTON_SERVICE_UUID.toUUID(),
                 MicrobitConstants.BUTTON_A_STATE_UUID.toUUID(),
+                enable = true,
                 MicrobitConstants.CCCD_UUID.toUUID(),
                 tag = "按钮a",
                 throttle = null,
@@ -167,11 +168,12 @@ object BluetoothDeviceTest {
         ) {
             JdcrBleLog.i("开启按钮a通知结果:$it")
         }
-        manager.registerNotification(
-            JdcrBleCommunicatorAction.RegisterNotification(
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
                 address,
                 MicrobitConstants.BUTTON_SERVICE_UUID.toUUID(),
                 MicrobitConstants.BUTTON_B_STATE_UUID.toUUID(),
+                enable = true,
                 MicrobitConstants.CCCD_UUID.toUUID(),
                 tag = "按钮b",
                 throttle = 100
@@ -183,11 +185,12 @@ object BluetoothDeviceTest {
 
     fun registerIO(address: String) {
         // 1. 注册 IO 引脚数据通知
-        manager.registerNotification(
-            JdcrBleCommunicatorAction.RegisterNotification(
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
                 address,
                 MicrobitConstants.IO_PIN_SERVICE_UUID.toUUID(),
                 MicrobitConstants.IO_PIN_DATA_UUID.toUUID(),
+                enable = true,
                 MicrobitConstants.CCCD_UUID.toUUID(),
                 tag = "IO引脚"
             )
@@ -209,11 +212,12 @@ object BluetoothDeviceTest {
         ) {
             JdcrBleLog.i("开启温度通知间隔结果:$it")
         }
-        manager.registerNotification(
-            JdcrBleCommunicatorAction.RegisterNotification(
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
                 address,
                 MicrobitConstants.TEMPERATURE_SERVICE_UUID.toUUID(),
                 MicrobitConstants.TEMPERATURE_DATA_UUID.toUUID(),
+                enable = true,
                 MicrobitConstants.CCCD_UUID.toUUID(),
                 tag = "温度通知"
             )
@@ -235,11 +239,12 @@ object BluetoothDeviceTest {
         ) {
             JdcrBleLog.i("开启加速度通知间隔结果:$it")
         }
-        manager.registerNotification(
-            JdcrBleCommunicatorAction.RegisterNotification(
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
                 address,
                 MicrobitConstants.ACCELEROMETER_SERVICE_UUID.toUUID(),
                 MicrobitConstants.ACCELEROMETER_DATA_UUID.toUUID(),
+                enable = true,
                 MicrobitConstants.CCCD_UUID.toUUID(),
                 throttle = 100,
                 tag = "加速度通知"
@@ -261,11 +266,12 @@ object BluetoothDeviceTest {
         ) {
             JdcrBleLog.i("开启磁力计通知间隔结果:$it")
         }
-        manager.registerNotification(
-            JdcrBleCommunicatorAction.RegisterNotification(
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
                 address,
                 MicrobitConstants.MAGNETOMETER_SERVICE_UUID.toUUID(),
                 MicrobitConstants.MAGNETOMETER_DATA_UUID.toUUID(),
+                enable = true,
                 MicrobitConstants.CCCD_UUID.toUUID(),
                 tag = "磁力计通知",
                 throttle = 1000,
@@ -300,6 +306,22 @@ object BluetoothDeviceTest {
             )
         ) {
             JdcrBleLog.i("写入LED结果:$it")
+        }
+    }
+
+    fun disableNotify(address: String) {
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
+                address,
+                MicrobitConstants.MAGNETOMETER_SERVICE_UUID.toUUID(),
+                MicrobitConstants.MAGNETOMETER_DATA_UUID.toUUID(),
+                enable = false,
+                MicrobitConstants.CCCD_UUID.toUUID(),
+                tag = "磁力计通知",
+                throttle = 1000,
+            )
+        ) {
+            JdcrBleLog.i("开启磁力计通知结果:$it")
         }
     }
 

@@ -118,6 +118,11 @@ class MainActivity : FragmentActivity() {
                         }) {
                             Text(text = "停止电机")
                         }
+                        Button(onClick = {
+                            helper.disableNotify(address)
+                        }) {
+                            Text(text = "关闭通知")
+                        }
                     }
                 }
             }

@@ -84,22 +84,32 @@ object BluetoothDeviceTudaoTest {
     }
 
     fun registerNotification(address: String) {
-        manager.registerNotification(
-            JdcrBleCommunicatorAction.RegisterNotification(
+        manager.enableNotification(
+            JdcrBleCommunicatorAction.EnableNotification(
                 address,
                 TudaoConstants.SeriviceId,
                 TudaoConstants.NotifyCharacteristicId,
+                enable = true,
                 tag = "通知",
             )
         ) {
         }
     }
 
-    fun motorForward(address: String, uiSpeed: Int = JdcrTudaoControllerUtils.DEFAULT_UI_MOTOR_SPEED) {
-        runMotor(address, JdcrTudaoControllerUtils.motorForward(JdcrTudaoControllerUtils.Motor.MOTOR_1, uiSpeed))
+    fun motorForward(
+        address: String,
+        uiSpeed: Int = JdcrTudaoControllerUtils.DEFAULT_UI_MOTOR_SPEED
+    ) {
+        runMotor(
+            address,
+            JdcrTudaoControllerUtils.motorForward(JdcrTudaoControllerUtils.Motor.MOTOR_1, uiSpeed)
+        )
     }
 
-    fun motorDualForward(address: String, uiSpeed: Int = JdcrTudaoControllerUtils.DEFAULT_UI_MOTOR_SPEED) {
+    fun motorDualForward(
+        address: String,
+        uiSpeed: Int = JdcrTudaoControllerUtils.DEFAULT_UI_MOTOR_SPEED
+    ) {
         runMotor(address, JdcrTudaoControllerUtils.motorDualForward(uiSpeed))
     }
 

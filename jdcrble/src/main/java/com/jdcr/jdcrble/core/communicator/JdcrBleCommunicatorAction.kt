@@ -2,6 +2,7 @@ package com.jdcr.jdcrble.core.communicator
 
 import android.bluetooth.BluetoothGattCharacteristic
 import androidx.annotation.IntDef
+import kotlinx.coroutines.CancellableContinuation
 import java.util.UUID
 
 sealed class JdcrBleCommunicatorAction(
@@ -66,10 +67,11 @@ sealed class JdcrBleCommunicatorAction(
         tag
     )
 
-    data class RegisterNotification(
+    data class EnableNotification(
         override val address: String,
         val serviceUUID: UUID,
         val characterUUID: UUID,
+        val enable: Boolean,
         val descriptorUUID: UUID = StandardDescriptorUUID,
         val isIndicationValue: Boolean = false,
         val throttle: Long? = null,
@@ -105,9 +107,10 @@ sealed class JdcrBleCommunicatorActionResult(
         val serviceUUID: UUID?,
         val characterUUID: UUID,
         val descriptorUUID: UUID,
+        val isEnable: Boolean,
         override val tag: String?
     ) :
-        JdcrBleCommunicatorActionResult("开启通知", tag)
+        JdcrBleCommunicatorActionResult("设置通知开关:$isEnable", tag)
 
     data class Read(
         val address: String,
@@ -133,4 +136,9 @@ data class NotificationData(
     val serviceUuid: UUID?,
     val characterUuid: UUID,
     val value: ByteArray?
+)
+
+data class PendingAction(
+    val action: JdcrBleCommunicatorAction,
+    val continuation: CancellableContinuation<Result<JdcrBleCommunicatorActionResult>>
 )

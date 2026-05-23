@@ -171,8 +171,8 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
         }
     }
 
-    fun registerNotification(
-        notification: JdcrBleCommunicatorAction.RegisterNotification,
+    fun enableNotification(
+        notification: JdcrBleCommunicatorAction.EnableNotification,
         onMainThread: Boolean = false,
         onComplete: ((Result<JdcrBleCommunicatorActionResult.Notification>) -> Unit)?
     ) {
@@ -185,6 +185,7 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
             }
         } else {
             JdcrBleLog.i("没有连接权限,不执行注册通知")
+            onComplete?.invoke(Result.failure(IllegalStateException("没有权限")))
         }
     }
 
@@ -202,6 +203,7 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
             }
         } else {
             JdcrBleLog.i("没有连接权限,不执行写入数据")
+            onComplete?.invoke(Result.failure(IllegalStateException("没有权限")))
         }
 
     }
@@ -220,6 +222,7 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
             }
         } else {
             JdcrBleLog.i("没有连接权限,不执行读取数据")
+            onComplete?.invoke(Result.failure(IllegalStateException("没有权限")))
         }
 
     }

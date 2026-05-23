@@ -127,22 +127,18 @@ open class JdcrBleConnectorImpl(
                 val descriptorUUID = descriptor.uuid
                 val address = gatt.device?.address ?: return
                 val currentAction = action.getCurrentAction(address)
-                if (currentAction is JdcrBleCommunicatorAction.RegisterNotification && descriptorUUID == currentAction.descriptorUUID) {
+                if (currentAction is JdcrBleCommunicatorAction.EnableNotification && uuid == currentAction.characterUUID && descriptorUUID == currentAction.descriptorUUID) {
                     val service = characteristic.service?.uuid
-                    val key = JdcrBleCommunicatorAction.getEnableNotifyKey(
-                        address,
-                        service,
-                        uuid,
-                        descriptorUUID
-                    )
+                    val isEnable = currentAction.enable
                     val result = JdcrBleCommunicatorActionResult.Notification(
                         address,
                         service,
                         uuid,
                         descriptor.uuid,
+                        isEnable,
                         currentAction.tag
                     )
-                    action.onActionResult(success, key, result)
+                    action.onActionResult(success, currentAction.key, result)
                 }
             }
 

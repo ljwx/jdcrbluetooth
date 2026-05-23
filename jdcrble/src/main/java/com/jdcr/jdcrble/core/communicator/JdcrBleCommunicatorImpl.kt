@@ -15,7 +15,6 @@ import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction.Companion.WR
 import com.jdcr.jdcrble.exception.JdcrBleCommunicationException
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
-import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
@@ -48,8 +47,7 @@ class JdcrBleCommunicatorImpl(
     private var actionChannelMap = ConcurrentHashMap<String, Channel<JdcrBleActionWrapper>>()
 
     private var currentActionMap = ConcurrentHashMap<String, JdcrBleCommunicatorAction>()
-    private val pendingActions =
-        ConcurrentHashMap<String, CancellableContinuation<Result<JdcrBleCommunicatorActionResult>>>()
+    private val pendingActions = ConcurrentHashMap<String, PendingAction>()
 
     private val notification = MutableSharedFlow<NotificationData>(
         replay = 0,
@@ -60,7 +58,7 @@ class JdcrBleCommunicatorImpl(
     private val dataMaxSizeMap = ConcurrentHashMap<String, Int>()
 
     private val notifyThrottleMap =
-        ConcurrentHashMap<String, JdcrBleCommunicatorAction.RegisterNotification>()
+        ConcurrentHashMap<String, JdcrBleCommunicatorAction.EnableNotification>()
 
     private fun initChannel(address: String) {
 
@@ -113,10 +111,10 @@ class JdcrBleCommunicatorImpl(
                                 result ?: Result.failure(TimeoutException("命令结果超时"))
                             }
 
-                            is JdcrBleCommunicatorAction.RegisterNotification -> {
+                            is JdcrBleCommunicatorAction.EnableNotification -> {
                                 val result = withTimeoutOrNull(config.timeoutMills) {
                                     JdcrBleLog.i("执行指令,${action.log}")
-                                    registerNotification(gatt, action)
+                                    enableNotification(gatt, action)
                                 }
                                 result ?: Result.failure(TimeoutException("命令结果超时"))
                             }
@@ -197,7 +195,7 @@ class JdcrBleCommunicatorImpl(
 
     private suspend fun getActionCancellableCoroutine(action: JdcrBleCommunicatorAction): Result<JdcrBleCommunicatorActionResult> {
         return suspendCancellableCoroutine { continuation ->
-            pendingActions[action.key] = continuation
+            pendingActions[action.key] = PendingAction(action, continuation)
             continuation.invokeOnCancellation {
                 pendingActions.remove(action.key)
             }
@@ -314,18 +312,19 @@ class JdcrBleCommunicatorImpl(
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private suspend fun registerNotification(
+    private suspend fun enableNotification(
         gatt: BluetoothGatt,
-        action: JdcrBleCommunicatorAction.RegisterNotification
+        action: JdcrBleCommunicatorAction.EnableNotification
     ): Result<JdcrBleCommunicatorActionResult> {
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         if (character != null) {
-            notifyThrottleMap["${action.address}_${action.serviceUUID}_${action.characterUUID}"] =
-                action
-            JdcrBleLog.i("设置特征值:${action.log}")
-            gatt.setCharacteristicNotification(character, true)
-            val value =
+            JdcrBleLog.i("设置特征值:${action.log},是否开启:${action.enable}")
+            gatt.setCharacteristicNotification(character, action.enable)
+            val value = if (action.enable) {
                 if (action.isIndicationValue) BluetoothGattDescriptor.ENABLE_INDICATION_VALUE else BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
+            } else {
+                BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE
+            }
             val descriptor = character.getDescriptor(action.descriptorUUID)
             if (descriptor != null) {
                 val writeResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -343,13 +342,13 @@ class JdcrBleCommunicatorImpl(
                 }
                 return getActionCancellableCoroutine(action)
             } else {
-                "描述符为空,注册失败:${action.log}".let {
+                "描述符为空,通知开关设置失败:${action.log}".let {
                     JdcrBleLog.w(it)
                     return Result.failure(JdcrBleCommunicationException(it))
                 }
             }
         } else {
-            "特征值为空,注册失败:${action.log}".let {
+            "特征值为空,通知开关设置失败:${action.log}".let {
                 JdcrBleLog.w(it)
                 return Result.failure(JdcrBleCommunicationException(it))
             }
@@ -389,11 +388,21 @@ class JdcrBleCommunicatorImpl(
         pendingActions.remove(key)?.apply {
             if (success) {
                 JdcrBleLog.i("通信结果成功,${actionResult.log},$key")
-                resume(Result.success(actionResult), null)
+                if (action is JdcrBleCommunicatorAction.EnableNotification && actionResult is JdcrBleCommunicatorActionResult.Notification) {
+                    val notifyKey =
+                        "${action.address}_${action.serviceUUID}_${action.characterUUID}"
+                    if (actionResult.isEnable) {
+                        notifyThrottleMap[notifyKey] = action
+                    } else {
+                        JdcrBleLog.w("关闭通知成功,${action.log}")
+                        notifyThrottleMap.remove(notifyKey)
+                    }
+                }
+                continuation.resume(Result.success(actionResult), null)
             } else {
                 "蓝牙服务回调返回失败:${actionResult.log},$key".let {
                     JdcrBleLog.w(it)
-                    resume(Result.failure(JdcrBleCommunicationException(it)), null)
+                    continuation.resume(Result.failure(JdcrBleCommunicationException(it)), null)
                 }
             }
         }
@@ -416,7 +425,7 @@ class JdcrBleCommunicatorImpl(
             while (hasNext()) {
                 val action = next()
                 if (action.key.contains(address, true)) {
-                    action.value.cancel()
+                    action.value.continuation.cancel()
                     remove()
                 }
             }
@@ -436,7 +445,7 @@ class JdcrBleCommunicatorImpl(
         }
         pendingActions.iterator().apply {
             while (hasNext()) {
-                next().value.cancel()
+                next().value.continuation.cancel()
                 remove()
             }
         }
