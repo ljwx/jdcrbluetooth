@@ -138,6 +138,8 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
         return connector.connect(device, config)
     }
 
+    override fun getDevice(address: String): BluetoothDevice? = connector?.getDevice(address)
+
     override fun getFinalMtu(address: String): Int? = connector?.getFinalMtu(address)
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)

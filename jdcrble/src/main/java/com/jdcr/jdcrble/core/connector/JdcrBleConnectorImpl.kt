@@ -329,6 +329,10 @@ open class JdcrBleConnectorImpl(
         }
     }
 
+    override fun getDevice(address: String): BluetoothDevice? {
+        return getDeviceStatus(address)?.device
+    }
+
     override fun getFinalMtu(address: String): Int? {
         return currentMtuMap[address]
     }

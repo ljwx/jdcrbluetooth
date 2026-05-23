@@ -8,6 +8,7 @@ import androidx.fragment.app.FragmentActivity
 import com.jdcr.jdcrble.available.JdcrBleEnableReceiver
 import com.jdcr.jdcrble.available.JdcrBleLocationEnableReceiver
 import com.jdcr.jdcrble.config.JdcrBleConfig
+import com.jdcr.jdcrble.config.JdcrBleConnectConfig
 import com.jdcr.jdcrble.config.JdcrBleScanConfig
 import com.jdcr.jdcrble.core.JdcrBleCore
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
@@ -99,13 +100,19 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun connect(address: String): Result<StateFlow<JdcrBleConnectState>?> {
-        return bleCore.connect(address)
+    fun connect(
+        address: String,
+        config: JdcrBleConnectConfig? = null
+    ): Result<StateFlow<JdcrBleConnectState>?> {
+        return bleCore.connect(address, config)
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    fun connect(device: BluetoothDevice): Result<StateFlow<JdcrBleConnectState>?> {
-        return bleCore.connect(device)
+    fun connect(
+        device: BluetoothDevice,
+        config: JdcrBleConnectConfig? = null
+    ): Result<StateFlow<JdcrBleConnectState>?> {
+        return bleCore.connect(device, config)
     }
 
     fun disconnect(address: String) {
@@ -173,6 +180,8 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
         }
 
     }
+
+    fun getDevice(address: String) = bleCore.getDevice(address)
 
     fun getNotificationDataFlow() = bleCore.getNotificationDataFlow()
 

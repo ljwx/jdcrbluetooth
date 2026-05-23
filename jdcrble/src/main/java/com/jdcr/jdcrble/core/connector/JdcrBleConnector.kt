@@ -19,6 +19,8 @@ interface JdcrBleConnector {
         config: JdcrBleConnectConfig? = null
     ): Result<StateFlow<JdcrBleConnectState>?>
 
+    fun getDevice(address: String): BluetoothDevice?
+
     fun getFinalMtu(address: String): Int?
 
     fun disconnect(address: String)
