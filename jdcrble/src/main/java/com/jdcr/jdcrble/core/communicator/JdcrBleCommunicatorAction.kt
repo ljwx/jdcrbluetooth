@@ -10,7 +10,7 @@ sealed class JdcrBleCommunicatorAction(
     val key: String,
     val desc: String,
     open val tag: String?,
-    val log: String = "$desc,$tag,$key",
+    val log: String = "$desc,${tag ?: ""},$key",
 ) {
     companion object {
 
@@ -99,7 +99,7 @@ sealed class JdcrBleCommunicatorAction(
 sealed class JdcrBleCommunicatorActionResult(
     val desc: String,
     open val tag: String?,
-    val log: String = "$desc,$tag",
+    val log: String = "$desc,${tag ?: ""}",
 ) {
 
     data class Notification(

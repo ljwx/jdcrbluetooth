@@ -179,6 +179,7 @@ open class JdcrBleConnectorImpl(
                 status: Int
             ) {
                 super.onCharacteristicWrite(gatt, characteristic, status)
+                JdcrBleLog.d("写数据原始结果:${status == BluetoothGatt.GATT_SUCCESS},${characteristic?.uuid}")
                 gatt ?: return
                 characteristic ?: return
                 val success = status == BluetoothGatt.GATT_SUCCESS
