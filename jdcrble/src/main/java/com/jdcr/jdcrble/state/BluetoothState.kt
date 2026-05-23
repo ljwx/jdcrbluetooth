@@ -107,8 +107,8 @@ sealed class JdcrBleConnectState(
 
 sealed class JdcrBleAvailableState(val desc: String) {
     object BleUnSupport : JdcrBleAvailableState("不支持蓝牙")
-    data class MissPermission(val permission: List<String>) :
-        JdcrBleAvailableState("缺少权限,权限列表:$permission")
+    data class MissPermission(val permission: Array<String>) :
+        JdcrBleAvailableState("缺少权限,权限列表:${permission.contentToString()}")
 
     object BleDisable : JdcrBleAvailableState("蓝牙未开启")
     object LocationDisable : JdcrBleAvailableState("定位未开启")

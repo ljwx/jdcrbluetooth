@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import androidx.annotation.RequiresPermission
 import com.jdcr.jdcrble.JdcrBleHelper
+import com.jdcr.jdcrble.config.JdcrBleConfig
 import com.jdcr.jdcrble.config.JdcrBleScanConfig
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.state.JdcrBleConnectState
@@ -22,7 +23,11 @@ object BluetoothDeviceTest {
     private var connectJob: Job? = null
 
     fun init(context: Context) {
-        manager = JdcrBleHelper(context).init()
+        val config = JdcrBleConfig().apply {
+            location.forceLocationPermission = true
+            location.forceFineLocation = true
+        }
+        manager = JdcrBleHelper(context, config = config).init()
         scop.launch {
             manager.getAvailableStateFlow().collect {
                 JdcrBleLog.i("蓝牙状态:$it")

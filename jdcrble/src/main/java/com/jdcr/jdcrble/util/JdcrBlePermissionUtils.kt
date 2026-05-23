@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import com.jdcr.jdcrble.config.JdcrLocationConfig
 
 object JdcrBlePermissionUtils {
 
@@ -107,8 +108,8 @@ object JdcrBlePermissionUtils {
 
     fun getMissPermission(
         context: Context,
-        forceLocationPermission: Boolean = false
-    ): List<String> {
+        location: JdcrLocationConfig
+    ): Array<String> {
         val missingList = mutableListOf<String>()
 
         fun location(): List<String> {
@@ -121,8 +122,9 @@ object JdcrBlePermissionUtils {
                 context,
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
-
-            if (!hasFine && !hasCoarse) {
+            if (location.forceFineLocation && !hasFine) {
+                locationList.add(Manifest.permission.ACCESS_FINE_LOCATION)
+            } else if (!hasFine && !hasCoarse) {
                 // 通常申请精度高的即可
                 locationList.add(Manifest.permission.ACCESS_FINE_LOCATION)
                 locationList.add(Manifest.permission.ACCESS_COARSE_LOCATION)
@@ -141,19 +143,19 @@ object JdcrBlePermissionUtils {
                     missingList.add(it)
                 }
             }
-            if (forceLocationPermission) {
+            if (location.forceLocationPermission) {
                 missingList.addAll(location())
             }
-            return missingList
+            return missingList.toTypedArray()
         } else {
             // --- Android 11 及以下 ---
             // 必须有定位权限才能搜到 BLE 设备
-            if (location().isNotEmpty()) {
+            val locationPermissions = location()
+            if (locationPermissions.isNotEmpty()) {
                 // 通常申请精度高的即可
-                missingList.add(Manifest.permission.ACCESS_FINE_LOCATION)
-                missingList.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+                missingList.addAll(locationPermissions)
             }
-            return missingList
+            return missingList.toTypedArray()
         }
     }
 

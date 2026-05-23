@@ -4,7 +4,9 @@ import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanResult
 import android.content.Context
 import android.location.LocationManager
+import android.os.Build
 import androidx.core.location.LocationManagerCompat
+import com.jdcr.jdcrble.config.JdcrLocationConfig
 import com.jdcr.jdcrble.state.JdcrBleAvailableState
 
 internal fun ScanResult.simpleInfo(deviceName: String?): String {
@@ -35,30 +37,34 @@ object JdcrBleUtils {
         return Result.success(LocationManagerCompat.isLocationEnabled(manager))
     }
 
-    fun isNeedLocationFeature(): Boolean {
-//        return Build.VERSION.SDK_INT < Build.VERSION_CODES.S && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-        return true //有些机型,可能需要定位权限
+    fun isNeedLocationFeature(forceLocationEnable: Boolean): Boolean {
+        if (forceLocationEnable) {
+            return true //有些机型,定位开启才能扫描出设备
+        } else {
+            return Build.VERSION.SDK_INT < Build.VERSION_CODES.S && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+        }
     }
 
     fun getBleAvailableState(
         context: Context,
-        forceLocationPermission: Boolean
+        location: JdcrLocationConfig
     ): JdcrBleAvailableState {
         if (!isBleSupport(context)) return JdcrBleAvailableState.BleUnSupport
 
-        val permissionResult = JdcrBlePermissionUtils.getMissPermission(context, forceLocationPermission)
+        val permissionResult =
+            JdcrBlePermissionUtils.getMissPermission(context, location)
         if (permissionResult.isNotEmpty()) {
             return JdcrBleAvailableState.MissPermission(permissionResult)
         }
 
-        if (isNeedLocationFeature()) {
+        if (!isBluetoothEnable(context).getOrElse { false }) {
+            return JdcrBleAvailableState.BleDisable
+        }
+
+        if (isNeedLocationFeature(location.enableLocationFeature)) {
             if (!isLocationEnable(context).getOrElse { false }) {
                 return JdcrBleAvailableState.LocationDisable
             }
-        }
-
-        if (!isBluetoothEnable(context).getOrElse { false }) {
-            return JdcrBleAvailableState.BleDisable
         }
 
         return JdcrBleAvailableState.Ready

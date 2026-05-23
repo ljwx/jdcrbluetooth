@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
+class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBleConfig()) {
 
     private val applicationContext = context.applicationContext
 
@@ -33,14 +33,19 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
     private val locationEnableReceiver by lazy { JdcrBleLocationEnableReceiver(applicationContext) }
 
     private var availableState =
-        MutableStateFlow(JdcrBleUtils.getBleAvailableState(applicationContext, true))
+        MutableStateFlow(
+            JdcrBleUtils.getBleAvailableState(
+                applicationContext,
+                config.location
+            )
+        )
 
     private val bleCore by lazy { JdcrBleCore(applicationContext, config) }
 
     fun init(): JdcrBleHelper {
         JdcrLog.enable(true)
         JdcrBleLog.i("初始化蓝牙帮助类状态")
-        if (JdcrBleUtils.isNeedLocationFeature()) {
+        if (JdcrBleUtils.isNeedLocationFeature(config.location.enableLocationFeature)) {
             locationEnableReceiver.register {
                 changeAvailableState()
             }
@@ -55,8 +60,9 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
     }
 
     fun changeAvailableState() {
-        availableState.value = JdcrBleUtils.getBleAvailableState(applicationContext, true)
-            .apply { "可用状态更新:${this.desc}" }
+        availableState.value =
+            JdcrBleUtils.getBleAvailableState(applicationContext, config.location)
+                .apply { "可用状态更新:${this.desc}" }
     }
 
     fun getAvailableStateFlow(): MutableStateFlow<JdcrBleAvailableState> {
@@ -79,6 +85,21 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
         JdcrBleLog.i("触发请求所有权限")
         val permissions = JdcrBlePermissionUtils.getAllPermissions()
         JdcrPermissionUtils.request(activity, permissions, callback)
+    }
+
+    fun requestMissPermissions(
+        activity: FragmentActivity,
+        callback: ((allGranted: Boolean, Map<String, Boolean>) -> Unit)?
+    ) {
+        JdcrBleLog.i("触发请求缺失的所有权限")
+        JdcrPermissionUtils.request(
+            activity,
+            JdcrBlePermissionUtils.getMissPermission(
+                applicationContext,
+                config.location
+            ),
+            callback
+        )
     }
 
     fun openPermissionSetting(activity: FragmentActivity, callback: (() -> Unit)) {
