@@ -55,7 +55,7 @@ open class JdcrBleConnectorImpl(
 
                 if (status != BluetoothGatt.GATT_SUCCESS) {
                     if (JdcrBlePermissionUtils.checkConnectPermission(context.applicationContext)) {
-                        serverExceptionAndGattDisconnect(device, status)
+                        serverExceptionAndGattDisconnect(device, gatt, status)
                     }
                     return
                 }
@@ -77,8 +77,6 @@ open class JdcrBleConnectorImpl(
 
                     BluetoothProfile.STATE_DISCONNECTED -> {
                         val state = getDeviceStatus(address)
-                        state?.gatt?.disconnect()
-                        state?.gatt?.close()
                         changeDeviceState(
                             address,
                             JdcrBleConnectState.Disconnected(device, gatt, state, status)
@@ -110,7 +108,7 @@ open class JdcrBleConnectorImpl(
                     }
                 } else {
                     JdcrBleLog.w("onServicesDiscovered失败")
-                    serverExceptionAndGattDisconnect(gatt.device, status)
+                    serverExceptionAndGattDisconnect(gatt.device, gatt, status)
                 }
             }
 
@@ -356,18 +354,55 @@ open class JdcrBleConnectorImpl(
         }
     }
 
+    private fun clearGattSource(address: String, gatt: BluetoothGatt?) {
+        runCatching {
+            if (JdcrBlePermissionUtils.checkConnectPermission(context)) {
+                gatt?.disconnect()
+                gatt?.close()
+            }
+        }.onFailure {
+            JdcrBleLog.w("主动关闭gatt失败:${address}", it)
+        }
+    }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    private fun serverExceptionAndGattDisconnect(device: BluetoothDevice, status: Int) {
+    fun onBluetoothDisabled() {
+        JdcrBleLog.w("检测到系统蓝牙关闭,强制断开连接")
+        val states = deviceStatusMap.entries.toList()
+        states.forEach { entry ->
+            val address = entry.key
+            val state = entry.value.value
+            val device = state.device
+            if (device != null) {
+                changeDeviceState(
+                    address,
+                    JdcrBleConnectState.Disconnected(
+                        device,
+                        state.gatt,
+                        state,
+                        BluetoothGatt.GATT_FAILURE
+                    )
+                )
+            } else {
+                clearGattSource(address, state.gatt)
+                clearDeviceSource(address)
+            }
+        }
+    }
+
+
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    private fun serverExceptionAndGattDisconnect(
+        device: BluetoothDevice,
+        gatt: BluetoothGatt,
+        status: Int
+    ) {
         val address = device.address
         val state = getDeviceStatus(address)
-        JdcrBleLog.d("蓝牙服务异常,执行gatt断开连接:${state?.desc}")
-        state?.gatt?.disconnect()
-        state?.gatt?.close()
-        action.removeGatt(address)
+        JdcrBleLog.d("蓝牙服务异常,上一个状态:${state?.desc}")
         changeDeviceState(
             address,
-            JdcrBleConnectState.Disconnected(device, null, state, status)
+            JdcrBleConnectState.Disconnected(device, gatt, state, status)
         )
     }
 
@@ -375,6 +410,7 @@ open class JdcrBleConnectorImpl(
         JdcrBleLog.i("触发连接状态变更:${status.desc},$address")
         deviceStatusMap[address]?.value = status
         if (status is JdcrBleConnectState.Disconnected) {
+            clearGattSource(address, status.gatt)
             clearDeviceSource(address)
         }
     }

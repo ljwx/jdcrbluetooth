@@ -21,6 +21,7 @@ import com.jdcr.jdcrble.exception.JdcrBleAvailableException
 import com.jdcr.jdcrble.state.JdcrBleConnectState
 import com.jdcr.jdcrble.state.JdcrBleScanResult
 import com.jdcr.jdcrble.util.JdcrBleLog
+import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -150,6 +151,12 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     override fun disconnectAll() {
         connector?.disconnectAll()
+    }
+
+    fun onBluetoothDisabled() {
+        if (JdcrBlePermissionUtils.checkConnectPermission(context)) {
+            connector?.onBluetoothDisabled()
+        }
     }
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)

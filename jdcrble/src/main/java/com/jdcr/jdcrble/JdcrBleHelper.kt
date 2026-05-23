@@ -45,8 +45,11 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
                 changeAvailableState()
             }
         }
-        bleEnableReceiver.register {
+        bleEnableReceiver.register { enableResult ->
             changeAvailableState()
+            if (enableResult.getOrNull() == false) {
+                bleCore.onBluetoothDisabled()
+            }
         }
         return this
     }
