@@ -82,7 +82,7 @@ object JdcrBlePermissionUtils {
         return true
     }
 
-    fun isMissBlePermission(permissions: List<String>): Boolean {
+    fun isMissBlePermission(permissions: Array<String>): Boolean {
         permissions.forEach {
             if (it == Manifest.permission.BLUETOOTH_SCAN) {
                 return true
@@ -94,12 +94,12 @@ object JdcrBlePermissionUtils {
         return false
     }
 
-    fun isMissLocationPermission(permissions: List<String>): Boolean {
+    fun isMissLocationPermission(forceFineLocation: Boolean, permissions: List<String>): Boolean {
         permissions.forEach {
             if (it == Manifest.permission.ACCESS_FINE_LOCATION) {
                 return true
             }
-            if (it == Manifest.permission.ACCESS_COARSE_LOCATION) {
+            if (!forceFineLocation && it == Manifest.permission.ACCESS_COARSE_LOCATION) {
                 return true
             }
         }
