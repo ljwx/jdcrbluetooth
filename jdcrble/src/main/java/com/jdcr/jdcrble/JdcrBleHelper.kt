@@ -119,6 +119,8 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
         return bleCore.startScan(config)
     }
 
+    fun getScanResult(address: String) = bleCore.getScanResult(address)
+
     fun stopScan() {
         if (JdcrBlePermissionUtils.checkScanPermission(applicationContext)) {
             bleCore.stopScan()

@@ -8,6 +8,8 @@ interface JdcrBleScanner {
 
     fun startScan(config: JdcrBleScanConfig? = null): Result<SharedFlow<JdcrBleScanResult>>
 
+    fun getScanResult(address: String): ScanResultWrapper?
+
     fun stopScan()
 
     fun release()

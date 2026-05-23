@@ -325,4 +325,6 @@ object BluetoothDeviceTest {
         }
     }
 
+    fun getScanResult(address: String) = manager.getScanResult(address)
+
 }

@@ -17,6 +17,7 @@ import com.jdcr.jdcrble.core.connector.JdcrBleConnector
 import com.jdcr.jdcrble.core.connector.JdcrBleConnectorImpl
 import com.jdcr.jdcrble.core.scanner.JdcrBleScanner
 import com.jdcr.jdcrble.core.scanner.JdcrBleScannerImpl
+import com.jdcr.jdcrble.core.scanner.ScanResultWrapper
 import com.jdcr.jdcrble.exception.JdcrBleAvailableException
 import com.jdcr.jdcrble.state.JdcrBleConnectState
 import com.jdcr.jdcrble.state.JdcrBleScanResult
@@ -108,6 +109,9 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
             createScanner() ?: return Result.failure(JdcrBleAvailableException("蓝牙不可用"))
         return scanner.startScan(config)
     }
+
+    override fun getScanResult(address: String): ScanResultWrapper? =
+        scanner?.getScanResult(address)
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     override fun stopScan() {

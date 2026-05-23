@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
+import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
 import com.jdcr.jdcrblecommon.selftest.BluetoothDeviceTest
 import com.jdcr.jdcrblecommon.selftest.BluetoothDeviceTudaoTest
@@ -122,6 +123,11 @@ class MainActivity : FragmentActivity() {
                             helper.disableNotify(address)
                         }) {
                             Text(text = "关闭通知")
+                        }
+                        Button(onClick = {
+                            JdcrBleLog.i(helper.getScanResult(address)?.result?.rssi?.toString())
+                        }) {
+                            Text(text = "信号强度")
                         }
                     }
                 }

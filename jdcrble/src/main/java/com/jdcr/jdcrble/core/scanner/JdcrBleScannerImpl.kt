@@ -200,6 +200,9 @@ open class JdcrBleScannerImpl(
         return copyResult
     }
 
+    override fun getScanResult(address: String): ScanResultWrapper? {
+        return scanResultList.filter { address == it.result.device.address }.firstOrNull()
+    }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
     override fun stopScan() {

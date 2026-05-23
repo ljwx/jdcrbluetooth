@@ -17,7 +17,7 @@ data class JdcrLocationConfig(
 
 data class JdcrBleScanConfig(
     var timeoutFinish: Long = 20000,
-    var minRssi: Int = -100,
+    var minRssi: Int = -150,
     var filterNullName: Boolean = true,
     var expiredTimeMills: Int = 2000,
     var resultIntervalMills: Long = 200,
