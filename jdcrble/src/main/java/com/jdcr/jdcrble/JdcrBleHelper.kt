@@ -8,6 +8,7 @@ import androidx.fragment.app.FragmentActivity
 import com.jdcr.jdcrble.available.JdcrBleEnableReceiver
 import com.jdcr.jdcrble.available.JdcrBleLocationEnableReceiver
 import com.jdcr.jdcrble.config.JdcrBleConfig
+import com.jdcr.jdcrble.config.JdcrBleScanConfig
 import com.jdcr.jdcrble.core.JdcrBleCore
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
@@ -23,7 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
-class JdcrBleHelper(context: Context) {
+class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
 
     private val applicationContext = context.applicationContext
 
@@ -33,11 +34,7 @@ class JdcrBleHelper(context: Context) {
     private var availableState =
         MutableStateFlow(JdcrBleUtils.getBleAvailableState(applicationContext, true))
 
-    private val bleCore by lazy {
-        JdcrBleCore(
-            applicationContext,
-            JdcrBleConfig().apply { connect.mtu = 100 })
-    }
+    private val bleCore by lazy { JdcrBleCore(applicationContext, config) }
 
     fun init(): JdcrBleHelper {
         JdcrLog.enable(true)
@@ -89,8 +86,8 @@ class JdcrBleHelper(context: Context) {
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
-    fun startScan(timeoutMills: Long): Result<SharedFlow<JdcrBleScanResult>> {
-        return bleCore.startScan(timeoutMills)
+    fun startScan(config: JdcrBleScanConfig? = null): Result<SharedFlow<JdcrBleScanResult>> {
+        return bleCore.startScan(config)
     }
 
     fun stopScan() {

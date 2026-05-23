@@ -15,7 +15,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
+import com.jdcr.jdcrblecommon.selftest.BluetoothDeviceTest
 import com.jdcr.jdcrblecommon.selftest.BluetoothDeviceTudaoTest
+import com.jdcr.jdcrblecommon.selftest.MicrobitConstants
 import com.jdcr.jdcrblecommon.selftest.TudaoConstants
 import com.jdcr.jdcrblecommon.ui.theme.JdcrBleCommonTheme
 import kotlinx.coroutines.Job
@@ -25,8 +27,10 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val address = TudaoConstants.TEST_ADDRESS
-        val helper = BluetoothDeviceTudaoTest
+//        val address = TudaoConstants.TEST_ADDRESS
+//        val helper = BluetoothDeviceTudaoTest
+        val address = MicrobitConstants.TEST_ADDRESS_2
+        val helper = BluetoothDeviceTest
         helper.init(this)
         var scanJob: Job? = null
         setContent {
@@ -69,7 +73,7 @@ class MainActivity : FragmentActivity() {
                         Button(onClick = {
                             if (JdcrBlePermissionUtils.checkScanPermission(applicationContext)) {
                                 scanJob = lifecycleScope.launch {
-                                    helper.startScan(10000).onSuccess {
+                                    helper.startScan().onSuccess {
                                         it.collect {
 //                                            JdcrBleLog.i("扫描结果:$it")
                                         }
@@ -100,17 +104,17 @@ class MainActivity : FragmentActivity() {
                             Text(text = "断开连接")
                         }
                         Button(onClick = {
-                            helper.motorDualForward(address)
+//                            helper.motorDualForward(address)
                         }) {
                             Text(text = "双轮前进")
                         }
                         Button(onClick = {
-                            helper.motorForward(address)
+//                            helper.motorForward(address)
                         }) {
                             Text(text = "M1 正转")
                         }
                         Button(onClick = {
-                            helper.stopMotor(address)
+//                            helper.stopMotor(address)
                         }) {
                             Text(text = "停止电机")
                         }

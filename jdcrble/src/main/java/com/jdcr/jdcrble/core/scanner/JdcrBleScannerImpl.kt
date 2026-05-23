@@ -28,8 +28,9 @@ open class JdcrBleScannerImpl(
     private val context: Context,
     private val scanner: BluetoothLeScanner,
     private val coroutine: CoroutineScope,
-    private val scanConfig: JdcrBleScanConfig,
 ) : JdcrBleScanner {
+
+    private var scanConfig: JdcrBleScanConfig = JdcrBleScanConfig()
 
     @Volatile
     private var isScanning = false
@@ -112,12 +113,14 @@ open class JdcrBleScannerImpl(
     }
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_SCAN)
-    override fun startScan(timeoutMills: Long): Result<SharedFlow<JdcrBleScanResult>> {
+    override fun startScan(config: JdcrBleScanConfig?): Result<SharedFlow<JdcrBleScanResult>> {
         JdcrBleLog.i("触发蓝牙扫描")
+
+        this.scanConfig = config ?: this.scanConfig
 
         fun startScanCountdown() {
             scanTimeoutJob = coroutine.launch {
-                delay(timeoutMills)
+                delay(scanConfig.timeoutFinish)
                 if (isScanning) {
                     JdcrBleLog.w("扫描倒计时结束,停止扫描")
                     scanner.stopScan(scanCallback)

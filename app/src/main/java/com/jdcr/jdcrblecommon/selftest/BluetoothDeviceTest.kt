@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import androidx.annotation.RequiresPermission
 import com.jdcr.jdcrble.JdcrBleHelper
+import com.jdcr.jdcrble.config.JdcrBleScanConfig
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.state.JdcrBleConnectState
 import com.jdcr.jdcrble.util.JdcrBleLog
@@ -124,7 +125,7 @@ object BluetoothDeviceTest {
     fun getHelper(): JdcrBleHelper = manager
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
-    fun startScan(timeoutMills: Long) = manager.startScan(timeoutMills)
+    fun startScan(config: JdcrBleScanConfig? = null) = manager.startScan(config)
 
     fun stopScan() = manager.stopScan()
 
@@ -134,8 +135,8 @@ object BluetoothDeviceTest {
             val flow = it
             connectJob?.cancel()
             connectJob = scop.launch {
-                JdcrBleLog.d("状态flow:$address,$flow")
                 flow?.collect {
+                    JdcrBleLog.i("连接状态:$it")
                     if (it is JdcrBleConnectState.Ready) {
                         registerTemperature(address)
                         registerAccelerometer(address)

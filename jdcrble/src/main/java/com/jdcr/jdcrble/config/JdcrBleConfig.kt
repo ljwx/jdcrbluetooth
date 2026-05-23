@@ -9,6 +9,7 @@ const val MTU_DEFAULT_SIZE = 23
 const val MTU_PLACEHOLDER = 3
 
 data class JdcrBleScanConfig(
+    var timeoutFinish: Long = 20000,
     var minRssi: Int = -100,
     var filterNullName: Boolean = true,
     var expiredTimeMills: Int = 2000,
@@ -31,7 +32,6 @@ data class JdcrBleScanConfig(
 }
 
 data class JdcrBleConnectConfig(
-    var maxConnectDevice: Int = 3,
     var mtu: Int? = null,
     val autoConnect: Boolean = false
 )
@@ -39,7 +39,8 @@ data class JdcrBleConnectConfig(
 data class BleCommunicateConfig(val timeoutMills: Long = 7000)
 
 data class JdcrBleConfig(
-    val scan: JdcrBleScanConfig = JdcrBleScanConfig(),
-    val connect: JdcrBleConnectConfig = JdcrBleConnectConfig(),
+    val maxConnectDevice: Int = 3,
+//    val scan: JdcrBleScanConfig = JdcrBleScanConfig(),
+//    val connect: JdcrBleConnectConfig = JdcrBleConnectConfig(),
     val communicate: BleCommunicateConfig = BleCommunicateConfig()
 )

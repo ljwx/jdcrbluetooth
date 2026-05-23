@@ -5,7 +5,7 @@ import android.bluetooth.BluetoothGatt
 import android.bluetooth.le.ScanResult
 import com.jdcr.jdcrble.core.scanner.ScanResultWrapper
 
-sealed class JdcrBleScanResult(desc: String) {
+sealed class JdcrBleScanResult(val desc: String) {
 
     data class ScanningList(
         val results: List<ScanResultWrapper>,

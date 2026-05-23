@@ -13,6 +13,7 @@ fun String.toUUID(): UUID {
 object MicrobitConstants {
 
     const val TEST_ADDRESS = "E7:31:CB:B0:F2:E5"
+    const val TEST_ADDRESS_2 = "E9:6A:88:D8:22:3A"
 
     // ===========================
     // 按键服务 (Button Service)

@@ -7,6 +7,8 @@ import android.bluetooth.BluetoothManager
 import android.content.Context
 import androidx.annotation.RequiresPermission
 import com.jdcr.jdcrble.config.JdcrBleConfig
+import com.jdcr.jdcrble.config.JdcrBleConnectConfig
+import com.jdcr.jdcrble.config.JdcrBleScanConfig
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorImpl
@@ -73,7 +75,6 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
                         context.applicationContext,
                         adapter.bluetoothLeScanner,
                         coroutine,
-                        config.scan
                     )
                     JdcrBleLog.i("初始化scanner:$scanner")
                 }
@@ -90,7 +91,7 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
                     connector = JdcrBleConnectorImpl(
                         context.applicationContext,
                         adapter,
-                        config.connect,
+                        config,
                         communicator
                     )
                     JdcrBleLog.i("初始化connector:$connector")
@@ -101,10 +102,10 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
     }
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_SCAN)
-    override fun startScan(timeoutMills: Long): Result<SharedFlow<JdcrBleScanResult>> {
+    override fun startScan(config: JdcrBleScanConfig?): Result<SharedFlow<JdcrBleScanResult>> {
         val scanner =
             createScanner() ?: return Result.failure(JdcrBleAvailableException("蓝牙不可用"))
-        return scanner.startScan(timeoutMills)
+        return scanner.startScan(config)
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
@@ -118,17 +119,23 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    override fun connect(address: String): Result<StateFlow<JdcrBleConnectState>?> {
+    override fun connect(
+        address: String,
+        config: JdcrBleConnectConfig?
+    ): Result<StateFlow<JdcrBleConnectState>?> {
         val connector =
             createConnector() ?: return Result.failure(JdcrBleAvailableException("蓝牙不可用"))
-        return connector.connect(address)
+        return connector.connect(address, config)
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    override fun connect(device: BluetoothDevice): Result<StateFlow<JdcrBleConnectState>?> {
+    override fun connect(
+        device: BluetoothDevice,
+        config: JdcrBleConnectConfig?
+    ): Result<StateFlow<JdcrBleConnectState>?> {
         val connector =
             createConnector() ?: return Result.failure(JdcrBleAvailableException("蓝牙不可用"))
-        return connector.connect(device)
+        return connector.connect(device, config)
     }
 
     override fun getFinalMtu(address: String): Int? = connector?.getFinalMtu(address)

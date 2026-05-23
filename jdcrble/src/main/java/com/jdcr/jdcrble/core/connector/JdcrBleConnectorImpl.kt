@@ -11,6 +11,7 @@ import android.bluetooth.BluetoothProfile
 import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresPermission
+import com.jdcr.jdcrble.config.JdcrBleConfig
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorImpl
@@ -28,9 +29,11 @@ import java.util.concurrent.ConcurrentHashMap
 open class JdcrBleConnectorImpl(
     private val context: Context,
     private val bleAdapter: BluetoothAdapter,
-    private val connectConfig: JdcrBleConnectConfig,
+    private val bleConfig: JdcrBleConfig,
     private val action: JdcrBleCommunicatorImpl
 ) : JdcrBleConnector {
+
+    private var connectConfig = JdcrBleConnectConfig()
 
     private val deviceStatusMap =
         ConcurrentHashMap<String, MutableStateFlow<JdcrBleConnectState>>()
@@ -266,7 +269,7 @@ open class JdcrBleConnectorImpl(
     }
 
     private fun isConnectLimit(): Boolean {
-        return deviceStatusMap.filter { it.value.value.stateStep > JdcrBleConnectState.INITIAL_STATUS }.size >= connectConfig.maxConnectDevice
+        return deviceStatusMap.filter { it.value.value.stateStep > JdcrBleConnectState.INITIAL_STATUS }.size >= bleConfig.maxConnectDevice
     }
 
     override fun isConnect(address: String): Boolean {
@@ -275,7 +278,11 @@ open class JdcrBleConnectorImpl(
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    override fun connect(address: String): Result<StateFlow<JdcrBleConnectState>?> {
+    override fun connect(
+        address: String,
+        config: JdcrBleConnectConfig?
+    ): Result<StateFlow<JdcrBleConnectState>?> {
+        this.connectConfig = config ?: connectConfig
         val device = bleAdapter.getRemoteDevice(address)
         if (device != null) {
             return connect(device)
@@ -288,7 +295,11 @@ open class JdcrBleConnectorImpl(
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
-    override fun connect(device: BluetoothDevice): Result<StateFlow<JdcrBleConnectState>?> {
+    override fun connect(
+        device: BluetoothDevice,
+        config: JdcrBleConnectConfig?
+    ): Result<StateFlow<JdcrBleConnectState>?> {
+        this.connectConfig = config ?: connectConfig
         val address = device.address
         JdcrBleLog.i("触发设备连接:${address}")
         if (isConnect(address)) {
@@ -325,13 +336,10 @@ open class JdcrBleConnectorImpl(
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     override fun disconnect(address: String) {
         JdcrBleLog.i("主动断开连接:$address")
-        deviceStatusMap.remove(address)?.value?.let {
-            it.gatt?.disconnect()
-            it.gatt?.close()
-            action.removeGatt(address)
+        deviceStatusMap[address]?.let {
+            it.value.gatt?.disconnect()
+            //it.gatt?.close() //直接关闭的话,无法在服务层接收到断连回调
         }
-        currentMtuMap.remove(address)
-        action.deviceDisconnected(address)
     }
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
@@ -363,11 +371,15 @@ open class JdcrBleConnectorImpl(
         JdcrBleLog.i("触发连接状态变更:${status.desc},$address")
         deviceStatusMap[address]?.value = status
         if (status is JdcrBleConnectState.Disconnected) {
-            deviceStatusMap.remove(address)
-            action.removeGatt(address)
-            currentMtuMap.remove(address)
-            action.deviceDisconnected(address)
+            clearDeviceSource(address)
         }
+    }
+
+    private fun clearDeviceSource(address: String) {
+        deviceStatusMap.remove(address)
+        action.removeGatt(address)
+        currentMtuMap.remove(address)
+        action.deviceDisconnected(address)
     }
 
     fun release() {
