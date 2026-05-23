@@ -59,6 +59,9 @@ class JdcrBleCommunicatorImpl(
 
     private val dataMaxSizeMap = ConcurrentHashMap<String, Int>()
 
+    private val notifyThrottleMap =
+        ConcurrentHashMap<String, JdcrBleCommunicatorAction.RegisterNotification>()
+
     private fun initChannel(address: String) {
 
         fun resultComplete(
@@ -317,6 +320,8 @@ class JdcrBleCommunicatorImpl(
     ): Result<JdcrBleCommunicatorActionResult> {
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         if (character != null) {
+            notifyThrottleMap["${action.address}_${action.serviceUUID}_${action.characterUUID}"] =
+                action
             JdcrBleLog.i("设置特征值:${action.log}")
             gatt.setCharacteristicNotification(character, true)
             val value =
@@ -352,7 +357,24 @@ class JdcrBleCommunicatorImpl(
     }
 
     internal fun onNotification(data: NotificationData) {
-        notification.tryEmit(data)
+        val notifyData =
+            notifyThrottleMap["${data.address}_${data.serviceUuid}_${data.characterUuid}"]
+        val throttle = notifyData?.throttle
+        if (throttle != null) {
+            val lastUpdate = notifyData.lastUpdate
+            if (lastUpdate == null) {
+                notifyData?.lastUpdate = System.currentTimeMillis()
+                notification.tryEmit(data)
+            } else {
+                if (System.currentTimeMillis() - lastUpdate >= throttle) {
+                    notifyData?.lastUpdate = System.currentTimeMillis()
+                    notification.tryEmit(data)
+                }
+            }
+        } else {
+            notifyData?.lastUpdate = System.currentTimeMillis()
+            notification.tryEmit(data)
+        }
     }
 
     override fun getNotificationDataFlow(): SharedFlow<NotificationData> {
@@ -382,6 +404,14 @@ class JdcrBleCommunicatorImpl(
         actionChannelMap.remove(address)
         currentActionMap.remove(address)
         dataMaxSizeMap.remove(address)
+        notifyThrottleMap.iterator().apply {
+            while (hasNext()) {
+                val notify = next()
+                if (notify.key.contains(address, true)) {
+                    remove()
+                }
+            }
+        }
         pendingActions.iterator().apply {
             while (hasNext()) {
                 val action = next()

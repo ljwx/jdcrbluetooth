@@ -11,7 +11,6 @@ import com.jdcr.jdcrble.util.JdcrBleLog
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
@@ -30,7 +29,7 @@ object BluetoothDeviceTest {
             }
         }
         scop.launch {
-            manager.getNotificationDataFlow()/*.sample(100)*/.collect { data ->
+            manager.getNotificationDataFlow().collect { data ->
                 data.value?.let { value ->
                     when (data.characterUuid.toString().uppercase()) {
                         MicrobitConstants.BUTTON_A_STATE_UUID -> {
@@ -78,8 +77,7 @@ object BluetoothDeviceTest {
                 .filter {
                     it.characterUuid.toString()
                         .uppercase() == MicrobitConstants.MAGNETOMETER_DATA_UUID
-                }
-                .sample(5000).collect { data ->
+                }.collect { data ->
                     data.value?.let { value ->
                         when (data.characterUuid.toString().uppercase()) {
                             MicrobitConstants.MAGNETOMETER_DATA_UUID -> {
@@ -100,8 +98,7 @@ object BluetoothDeviceTest {
                 .filter {
                     it.characterUuid.toString()
                         .uppercase() == MicrobitConstants.ACCELEROMETER_DATA_UUID
-                }
-                .sample(5000).collect { data ->
+                }.collect { data ->
                     data.value?.let { value ->
                         when (data.characterUuid.toString().uppercase()) {
                             MicrobitConstants.ACCELEROMETER_DATA_UUID -> {
@@ -159,7 +156,8 @@ object BluetoothDeviceTest {
                 MicrobitConstants.BUTTON_SERVICE_UUID.toUUID(),
                 MicrobitConstants.BUTTON_A_STATE_UUID.toUUID(),
                 MicrobitConstants.CCCD_UUID.toUUID(),
-                tag = "按钮a"
+                tag = "按钮a",
+                throttle = null,
             )
         ) {
             JdcrBleLog.i("开启按钮a通知结果:$it")
@@ -170,7 +168,8 @@ object BluetoothDeviceTest {
                 MicrobitConstants.BUTTON_SERVICE_UUID.toUUID(),
                 MicrobitConstants.BUTTON_B_STATE_UUID.toUUID(),
                 MicrobitConstants.CCCD_UUID.toUUID(),
-                tag = "按钮b"
+                tag = "按钮b",
+                throttle = 100
             )
         ) {
             JdcrBleLog.i("开启按钮b通知结果:$it")
@@ -237,6 +236,7 @@ object BluetoothDeviceTest {
                 MicrobitConstants.ACCELEROMETER_SERVICE_UUID.toUUID(),
                 MicrobitConstants.ACCELEROMETER_DATA_UUID.toUUID(),
                 MicrobitConstants.CCCD_UUID.toUUID(),
+                throttle = 100,
                 tag = "加速度通知"
             )
         ) {
@@ -261,7 +261,9 @@ object BluetoothDeviceTest {
                 address,
                 MicrobitConstants.MAGNETOMETER_SERVICE_UUID.toUUID(),
                 MicrobitConstants.MAGNETOMETER_DATA_UUID.toUUID(),
-                MicrobitConstants.CCCD_UUID.toUUID()
+                MicrobitConstants.CCCD_UUID.toUUID(),
+                tag = "磁力计通知",
+                throttle = 1000,
             )
         ) {
             JdcrBleLog.i("开启磁力计通知结果:$it")

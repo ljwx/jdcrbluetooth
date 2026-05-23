@@ -72,7 +72,7 @@ sealed class JdcrBleCommunicatorAction(
         val characterUUID: UUID,
         val descriptorUUID: UUID = StandardDescriptorUUID,
         val isIndicationValue: Boolean = false,
-        val interval: Long = 50,
+        val throttle: Long? = null,
         override val tag: String? = null
     ) :
         JdcrBleCommunicatorAction(
@@ -88,6 +88,9 @@ sealed class JdcrBleCommunicatorAction(
             val StandardDescriptorUUID =
                 UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
         }
+
+        internal var lastUpdate: Long? = null
+
     }
 }
 
