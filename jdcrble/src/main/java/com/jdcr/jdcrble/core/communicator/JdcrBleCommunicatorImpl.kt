@@ -85,10 +85,10 @@ class JdcrBleCommunicatorImpl(
 
         fun looper(channel: Channel<JdcrBleActionWrapper>) {
             coroutine.launch {
-                try {
-                    for (wrapper in channel) {
-                        val action = wrapper.action
-                        val actionAddress = action.address
+                for (wrapper in channel) {
+                    val action = wrapper.action
+                    val actionAddress = action.address
+                    try {
                         currentActionMap[actionAddress] = action
                         val gatt = this@JdcrBleCommunicatorImpl.gatts[actionAddress]
                         if (gatt == null) {
@@ -129,11 +129,18 @@ class JdcrBleCommunicatorImpl(
                         }
                         currentActionMap.remove(actionAddress)
                         resultComplete(wrapper, result)
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        JdcrBleLog.w("通信渠道已关闭,${address}")
+                        throw e
+                    } catch (e: Exception) {
+                        JdcrBleLog.e("执行通信出现异常", e)
+                        currentActionMap.remove(actionAddress)
+                        resultComplete(
+                            wrapper,
+                            Result.failure(JdcrBleCommunicationException(e.message ?: ""))
+                        )
                     }
-                } catch (e: CancellationException) {
-                    JdcrBleLog.w("通信已关闭,${address}")
-                } catch (e: Exception) {
-                    JdcrBleLog.e("执行通信出现异常", e)
+
                 }
             }
         }
@@ -258,7 +265,8 @@ class JdcrBleCommunicatorImpl(
         packet: ByteArray
     ): Result<JdcrBleCommunicatorActionResult> {
         val writeType = action.writeType
-//        val properties = character.properties
+
+        //        val properties = character.properties
 //        when {
 //            properties and BluetoothGattCharacteristic.PROPERTY_WRITE_NO_RESPONSE != 0 -> {
 //                BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
@@ -442,7 +450,7 @@ class JdcrBleCommunicatorImpl(
                     continuation.resume(Result.failure(JdcrBleCommunicationException(it)), null)
                 }
             }
-        }
+        } ?: JdcrBleLog.w("收到过期或未匹配指令回调:$key")
     }
 
     fun deviceDisconnected(address: String) {
@@ -486,6 +494,7 @@ class JdcrBleCommunicatorImpl(
                 remove()
             }
         }
+        notifyThrottleMap.clear()
     }
 
 }
