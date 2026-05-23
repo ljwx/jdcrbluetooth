@@ -131,17 +131,30 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
         }
     }
 
+    private inline fun <reified T : JdcrBleCommunicatorActionResult> handleResult(
+        result: Result<JdcrBleCommunicatorActionResult>,
+    ): Result<T> {
+        if (result.isFailure) return result as Result<T>
+        return when (val value = result.getOrNull()) {
+            is T -> result as Result<T>
+            else -> Result.failure(
+                IllegalStateException("数据类型不匹配: 期望 ${T::class.simpleName}, 实际 ${value?.javaClass?.simpleName}")
+            )
+        }
+    }
+
     fun registerNotification(
         notification: JdcrBleCommunicatorAction.RegisterNotification,
         onMainThread: Boolean = false,
-        onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
+        onComplete: ((Result<JdcrBleCommunicatorActionResult.Notification>) -> Unit)?
     ) {
         if (JdcrBlePermissionUtils.checkConnectPermission(applicationContext)) {
             bleCore.sendAction(
                 notification,
                 onMainThread,
-                onComplete
-            )
+            ) {
+                onComplete?.invoke(handleResult(it))
+            }
         } else {
             JdcrBleLog.i("没有连接权限,不执行注册通知")
         }
@@ -150,14 +163,15 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
     fun write(
         write: JdcrBleCommunicatorAction.Write,
         onMainThread: Boolean = false,
-        onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
+        onComplete: ((Result<JdcrBleCommunicatorActionResult.Write>) -> Unit)?
     ) {
         if (JdcrBlePermissionUtils.checkConnectPermission(applicationContext)) {
             bleCore.sendAction(
                 write,
                 onMainThread,
-                onComplete
-            )
+            ) {
+                onComplete?.invoke(handleResult(it))
+            }
         } else {
             JdcrBleLog.i("没有连接权限,不执行写入数据")
         }
@@ -167,14 +181,15 @@ class JdcrBleHelper(context: Context, config: JdcrBleConfig = JdcrBleConfig()) {
     fun read(
         read: JdcrBleCommunicatorAction.Read,
         onMainThread: Boolean = false,
-        onComplete: ((Result<JdcrBleCommunicatorActionResult>) -> Unit)?
+        onComplete: ((Result<JdcrBleCommunicatorActionResult.Read>) -> Unit)?
     ) {
         if (JdcrBlePermissionUtils.checkConnectPermission(applicationContext)) {
             bleCore.sendAction(
                 read,
                 onMainThread,
-                onComplete
-            )
+            ) {
+                onComplete?.invoke(handleResult(it))
+            }
         } else {
             JdcrBleLog.i("没有连接权限,不执行读取数据")
         }
