@@ -193,11 +193,38 @@ class JdcrBleCommunicatorImpl(
         return currentActionMap[address]
     }
 
-    private suspend fun getActionCancellableCoroutine(action: JdcrBleCommunicatorAction): Result<JdcrBleCommunicatorActionResult> {
+    private suspend fun getActionCancellableCoroutine(
+        action: JdcrBleCommunicatorAction,
+        triggerRequest: () -> Boolean,
+        requestFailMessage: String
+    ): Result<JdcrBleCommunicatorActionResult> {
         return suspendCancellableCoroutine { continuation ->
             pendingActions[action.key] = PendingAction(action, continuation)
             continuation.invokeOnCancellation {
                 pendingActions.remove(action.key)
+            }
+            val requestSuccess = try {
+                triggerRequest()
+            } catch (e: Exception) {
+                pendingActions.remove(action.key)
+                JdcrBleLog.w(requestFailMessage, e)
+                continuation.resume(
+                    Result.failure(
+                        JdcrBleCommunicationException(
+                            "$requestFailMessage,${e.message ?: "未知异常"}"
+                        )
+                    ),
+                    null
+                )
+                return@suspendCancellableCoroutine
+            }
+            if (!requestSuccess) {
+                pendingActions.remove(action.key)
+                JdcrBleLog.w(requestFailMessage)
+                continuation.resume(
+                    Result.failure(JdcrBleCommunicationException(requestFailMessage)),
+                    null
+                )
             }
         }
     }
@@ -214,14 +241,12 @@ class JdcrBleCommunicatorImpl(
                 return Result.failure(JdcrBleCommunicationException(it))
             }
         } else {
-            val success = gatt.readCharacteristic(character)
-            if (!success) {
-                "请求读取数据操作失败:${action.log}".let {
-                    JdcrBleLog.w(it)
-                    return Result.failure(JdcrBleCommunicationException(it))
-                }
-            }
-            return getActionCancellableCoroutine(action)
+            val failMessage = "请求读取数据操作失败:${action.log}"
+            return getActionCancellableCoroutine(
+                action = action,
+                triggerRequest = { gatt.readCharacteristic(character) },
+                requestFailMessage = failMessage
+            )
         }
     }
 
@@ -247,34 +272,41 @@ class JdcrBleCommunicatorImpl(
 //                BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
 //            }
 //        }
-        val success = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val status = gatt.writeCharacteristic(character, packet, writeType)
-            val success = status == BluetoothStatusCodes.SUCCESS
-            success
-        } else {
-            character.value = packet
-            character.writeType = writeType
-            val success = gatt.writeCharacteristic(character)
-            success
-        }
-        delay(30)
-        if (!success) {
-            "请求写入数据操作失败:${action.log}".let {
-                JdcrBleLog.w(it)
-                return Result.failure(JdcrBleCommunicationException(it))
+        fun requestWrite(): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val status = gatt.writeCharacteristic(character, packet, writeType)
+                status == BluetoothStatusCodes.SUCCESS
+            } else {
+                character.value = packet
+                character.writeType = writeType
+                gatt.writeCharacteristic(character)
             }
         }
-        JdcrBleLog.i("写入数据完成:${action.log}")
-        return if (action.writeType == WRITE_TYPE_NO_RESPONSE) Result.success(
-            JdcrBleCommunicatorActionResult.Write(
-                action.address,
-                action.serviceUUID,
-                action.characterUUID,
-                action.tag
-            )
-        )
-            .apply { JdcrBleLog.i("写入类型不需要响应,直接返回成功") } else getActionCancellableCoroutine(
-            action
+
+        if (action.writeType == WRITE_TYPE_NO_RESPONSE) {
+            val success = requestWrite()
+            delay(30)
+            if (!success) {
+                "请求写入数据操作失败:${action.log}".let {
+                    JdcrBleLog.w(it)
+                    return Result.failure(JdcrBleCommunicationException(it))
+                }
+            }
+            JdcrBleLog.i("写入数据完成:${action.log}")
+            return Result.success(
+                JdcrBleCommunicatorActionResult.Write(
+                    action.address,
+                    action.serviceUUID,
+                    action.characterUUID,
+                    action.tag
+                )
+            ).apply { JdcrBleLog.i("写入类型不需要响应,直接返回成功") }
+        }
+        JdcrBleLog.i("写入数据请求已提交:${action.log}")
+        return getActionCancellableCoroutine(
+            action = action,
+            triggerRequest = { requestWrite() },
+            requestFailMessage = "请求写入数据操作失败:${action.log}"
         )
     }
 
@@ -319,7 +351,13 @@ class JdcrBleCommunicatorImpl(
         val character = gatt.getService(action.serviceUUID)?.getCharacteristic(action.characterUUID)
         if (character != null) {
             JdcrBleLog.i("设置特征值:${action.log},是否开启:${action.enable}")
-            gatt.setCharacteristicNotification(character, action.enable)
+            val setResult = gatt.setCharacteristicNotification(character, action.enable)
+            if (!setResult) {
+                "设置通知特征失败:${action.log}".let {
+                    JdcrBleLog.w(it)
+                    return Result.failure(JdcrBleCommunicationException(it))
+                }
+            }
             val value = if (action.enable) {
                 if (action.isIndicationValue) BluetoothGattDescriptor.ENABLE_INDICATION_VALUE else BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
             } else {
@@ -327,20 +365,19 @@ class JdcrBleCommunicatorImpl(
             }
             val descriptor = character.getDescriptor(action.descriptorUUID)
             if (descriptor != null) {
-                val writeResult = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    val result = gatt.writeDescriptor(descriptor, value)
-                    result == 0
-                } else {
-                    descriptor.value = value
-                    gatt.writeDescriptor(descriptor)
-                }
-                if (!writeResult) {
-                    "通知描述符写入指令失败:${action.log}".let {
-                        JdcrBleLog.w(it)
-                        return Result.failure(JdcrBleCommunicationException(it))
-                    }
-                }
-                return getActionCancellableCoroutine(action)
+                return getActionCancellableCoroutine(
+                    action = action,
+                    triggerRequest = {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            val result = gatt.writeDescriptor(descriptor, value)
+                            result == 0
+                        } else {
+                            descriptor.value = value
+                            gatt.writeDescriptor(descriptor)
+                        }
+                    },
+                    requestFailMessage = "通知描述符写入指令失败:${action.log}"
+                )
             } else {
                 "描述符为空,通知开关设置失败:${action.log}".let {
                     JdcrBleLog.w(it)
