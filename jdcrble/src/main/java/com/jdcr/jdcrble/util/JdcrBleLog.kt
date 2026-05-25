@@ -5,7 +5,7 @@ import com.jdcr.jdcrlog.JdcrLogBase
 object JdcrBleLog : JdcrLogBase() {
 
     init {
-        setDefaultTag("ble")
+        setDefaultTag("bluetooth")
     }
 
 }
