@@ -249,7 +249,7 @@ open class JdcrBleConnectorImpl(
                 }
                 JdcrBleLog.i("实际mtu大小:$mtu")
                 action.setMaxDataSize(address, mtu - MTU_PLACEHOLDER)
-                changeDeviceState(address, JdcrBleConnectState.Ready(device, gatt))
+                changeDeviceState(address, JdcrBleConnectState.Ready(device, gatt, mtu = mtu))
             }
 
         }
