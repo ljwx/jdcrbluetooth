@@ -28,7 +28,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
-import kotlin.coroutines.cancellation.CancellationException
 
 data class JdcrBleActionWrapper(
     val action: JdcrBleCommunicatorAction,
@@ -164,6 +163,10 @@ class JdcrBleCommunicatorImpl(
                 }
             }
         }
+    }
+
+    fun getGatt(address: String): BluetoothGatt? {
+        return gatts[address]
     }
 
     fun setGatt(address: String, gatt: BluetoothGatt) {
@@ -461,7 +464,7 @@ class JdcrBleCommunicatorImpl(
         notifyThrottleMap.iterator().apply {
             while (hasNext()) {
                 val notify = next()
-                if (notify.key.contains(address, true)) {
+                if (notify.key.startsWith(address, true)) {
                     remove()
                 }
             }

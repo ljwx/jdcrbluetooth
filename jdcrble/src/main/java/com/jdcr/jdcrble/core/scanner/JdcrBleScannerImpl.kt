@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.cancellation.CancellationException
 
 open class JdcrBleScannerImpl(
@@ -39,7 +40,7 @@ open class JdcrBleScannerImpl(
     private var scanTimeoutJob: Job? = null
     private val scanResultSerial = Dispatchers.Default.limitedParallelism(1)
     private var scanResultChannel: Channel<ScanResult>? = null
-    private val scanResultList by lazy { ArrayList<ScanResultWrapper>(32) }
+    private val scanResultMap by lazy { ConcurrentHashMap<String, ScanResultWrapper>(32) }
     private val scanResultFlow = MutableSharedFlow<JdcrBleScanResult>(
         replay = 1,
         extraBufferCapacity = 5,
@@ -61,7 +62,7 @@ open class JdcrBleScannerImpl(
 
     private fun startScanTask() {
         sendScanResultJob = coroutine.launch(scanResultSerial) {
-            scanResultList.clear()
+            scanResultMap.clear()
             while (isActive) {
                 delay(scanConfig.resultIntervalMills)
                 val newResult = handleResult()
@@ -71,21 +72,21 @@ open class JdcrBleScannerImpl(
 
         fun mergeResult(result: ScanResult, connectPermission: Boolean) {
             val device = result.device
-            val existsIndex =
-                scanResultList.indexOfFirst { it.result.device.address == device.address }
+            val address = device.address
+            val exist = scanResultMap[address] != null
             if (result.rssi < scanConfig.minRssi) {
-                if (existsIndex >= 0) {
+                if (exist) {
                     JdcrBleLog.v("扫描结果,信号太弱,移除该设备:${device.address}")
-                    scanResultList.removeAt(existsIndex)
+                    scanResultMap.remove(address)
                 }
             } else {
                 val deviceName = if (connectPermission) device.name else null
-                if (existsIndex >= 0) {
+                if (exist) {
                     JdcrBleLog.v("扫描结果,更新该设备:$deviceName,${device.address}")
-                    scanResultList[existsIndex] = ScanResultWrapper(result, deviceName)
+                    scanResultMap[address] = ScanResultWrapper(result, deviceName)
                 } else {
                     JdcrBleLog.v("扫描结果,添加该设备:$deviceName,${device.address}")
-                    scanResultList.add(ScanResultWrapper(result, deviceName))
+                    scanResultMap[address] = ScanResultWrapper(result, deviceName)
                 }
             }
         }
@@ -136,9 +137,9 @@ open class JdcrBleScannerImpl(
             }
             startScanTask()
             JdcrBleLog.i("执行系统扫描")
+            isScanning = true
             scanner.startScan(scanConfig.scanFilters, scanConfig.settings, scanCallback)
             startScanCountdown()
-            isScanning = true
             scanResultFlow.asSharedFlow()
         }.onFailure {
             scanFinish(
@@ -169,7 +170,7 @@ open class JdcrBleScannerImpl(
 
     private fun handleResult(): List<ScanResultWrapper> {
         val permission = JdcrBlePermissionUtils.checkConnectPermission(context)
-        val copyResult = ArrayList(scanResultList)
+        val copyResult = scanResultMap.values.toMutableList()
         fun clearDevice() {
             val currentBootMillis = SystemClock.elapsedRealtime()
             val iterator = copyResult.iterator()
@@ -201,7 +202,7 @@ open class JdcrBleScannerImpl(
     }
 
     override fun getScanResult(address: String): ScanResultWrapper? {
-        return scanResultList.filter { address == it.result.device.address }.firstOrNull()
+        return scanResultMap[address]
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)
@@ -228,7 +229,7 @@ open class JdcrBleScannerImpl(
         handleScanResultJob = null
         coroutine.launch(scanResultSerial) {
             isScanning = false
-            scanResultList.clear()
+            scanResultMap.clear()
             scanResultFlow.tryEmit(result)
         }
     }

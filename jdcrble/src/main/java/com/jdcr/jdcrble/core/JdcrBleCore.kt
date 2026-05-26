@@ -94,7 +94,8 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
                         context.applicationContext,
                         adapter,
                         config,
-                        communicator
+                        communicator,
+                        coroutine,
                     )
                     JdcrBleLog.i("初始化connector:$connector")
                 }

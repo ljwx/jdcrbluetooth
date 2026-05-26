@@ -24,14 +24,14 @@
 
 
     <!--兼容版-->
-    <uses-permission android:name="android.permission.BLUETOOTH" />
-    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-<!--    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />-->
+<!--    <uses-permission android:name="android.permission.BLUETOOTH" />-->
+<!--    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />-->
+<!--    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />-->
+<!--&lt;!&ndash;    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />&ndash;&gt;-->
 
-    <!--Android 12+ 蓝牙扫描权限：明确声明不用于获取位置-->
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <uses-permission
-        android:name="android.permission.BLUETOOTH_SCAN"
-        tools:targetApi="s" />
+<!--    &lt;!&ndash;Android 12+ 蓝牙扫描权限：明确声明不用于获取位置&ndash;&gt;-->
+<!--    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />-->
+<!--    <uses-permission-->
+<!--        android:name="android.permission.BLUETOOTH_SCAN"-->
+<!--        tools:targetApi="s" />-->
 </manifest>

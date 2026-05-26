@@ -43,7 +43,6 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
     private val bleCore by lazy { JdcrBleCore(applicationContext, config) }
 
     fun init(): JdcrBleHelper {
-        JdcrLog.enable(true)
         JdcrBleLog.i("初始化蓝牙帮助类状态")
         if (JdcrBleUtils.isNeedLocationFeature(config.location.enableLocationFeature)) {
             locationEnableReceiver.register {
@@ -62,10 +61,10 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
     fun changeAvailableState() {
         availableState.value =
             JdcrBleUtils.getBleAvailableState(applicationContext, config.location)
-                .apply { "可用状态更新:${this.desc}" }
+                .apply { JdcrBleLog.i("可用状态更新:${this.desc}") }
     }
 
-    fun getAvailableStateFlow(): MutableStateFlow<JdcrBleAvailableState> {
+    fun getAvailableStateFlow(): StateFlow<JdcrBleAvailableState> {
         return availableState
     }
 
@@ -236,6 +235,7 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
     fun onRelease() {
         bleEnableReceiver.close()
         locationEnableReceiver.close()
+        bleCore.release()
     }
 
     fun onDestroy() {

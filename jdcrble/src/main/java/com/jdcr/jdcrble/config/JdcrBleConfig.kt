@@ -19,7 +19,7 @@ data class JdcrBleScanConfig(
     var timeoutFinish: Long = 20000,
     var minRssi: Int = -150,
     var filterNullName: Boolean = true,
-    var expiredTimeMills: Int = 2000,
+    var expiredTimeMills: Int = 3000,
     var resultIntervalMills: Long = 200,
     var rssiSort: Boolean = true,
     var scanFilters: List<ScanFilter>? = null,
@@ -47,6 +47,7 @@ data class BleCommunicateConfig(var timeoutMills: Long = 7000)
 
 data class JdcrBleConfig(
     val maxConnectDevice: Int = 3,
+    val connectTimeoutMills: Long = 10000,
     val location: JdcrLocationConfig = JdcrLocationConfig(),
 //    val scan: JdcrBleScanConfig = JdcrBleScanConfig(),
 //    val connect: JdcrBleConnectConfig = JdcrBleConnectConfig(),

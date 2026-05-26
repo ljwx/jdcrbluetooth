@@ -21,6 +21,7 @@ import com.jdcr.jdcrblecommon.selftest.BluetoothDeviceTudaoTest
 import com.jdcr.jdcrblecommon.selftest.MicrobitConstants
 import com.jdcr.jdcrblecommon.selftest.TudaoConstants
 import com.jdcr.jdcrblecommon.ui.theme.JdcrBleCommonTheme
+import com.jdcr.jdcrlog.JdcrLog
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -28,6 +29,7 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        JdcrLog.enable(true)
 //        val address = TudaoConstants.TEST_ADDRESS
 //        val helper = BluetoothDeviceTudaoTest
         val address = MicrobitConstants.TEST_ADDRESS_2
