@@ -181,7 +181,7 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
         rootJob.cancelChildren()
         scanner?.release()
         connector?.release()
-        communicator?.release()
+        communicator.release()
     }
 
 }

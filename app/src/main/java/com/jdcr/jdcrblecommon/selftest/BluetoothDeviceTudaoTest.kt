@@ -7,8 +7,8 @@ import com.jdcr.jdcrble.JdcrBleHelper
 import com.jdcr.jdcrble.config.JdcrBleScanConfig
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.state.JdcrBleConnectState
-import com.jdcr.jdcrble.usecase.JdcrTudaoControllerUtils
-import com.jdcr.jdcrble.usecase.JdcrTudaoNotifyUtils
+import com.jdcr.jdcrblecommon.selftest.usecase.JdcrTudaoControllerUtils
+import com.jdcr.jdcrblecommon.selftest.usecase.JdcrTudaoNotifyUtils
 import com.jdcr.jdcrble.util.JdcrBleHexUtils.toHexString
 import com.jdcr.jdcrble.util.JdcrBleLog
 import kotlinx.coroutines.GlobalScope

@@ -42,7 +42,7 @@ open class JdcrBleScannerImpl(
     private var scanResultChannel: Channel<ScanResult>? = null
     private val scanResultMap by lazy { ConcurrentHashMap<String, ScanResultWrapper>(32) }
     private val scanResultFlow = MutableSharedFlow<JdcrBleScanResult>(
-        replay = 1,
+        replay = 0,
         extraBufferCapacity = 5,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )

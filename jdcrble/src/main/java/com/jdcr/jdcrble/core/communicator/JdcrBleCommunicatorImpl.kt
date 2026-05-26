@@ -155,7 +155,7 @@ class JdcrBleCommunicatorImpl(
                 if (actionChannelMap[address] == null) {
                     val channel: Channel<JdcrBleActionWrapper> = Channel(
                         capacity = 256,
-                        onBufferOverflow = BufferOverflow.DROP_OLDEST
+                        onBufferOverflow = BufferOverflow.SUSPEND
                     )
                     actionChannelMap[address] = channel
                     JdcrBleLog.i("创建通信通道:$address")
@@ -192,7 +192,7 @@ class JdcrBleCommunicatorImpl(
         val channel = actionChannelMap[action.address]
         if (channel?.isClosedForSend == false) {
             if (channel.trySend(JdcrBleActionWrapper(action, onComplete, inMainThread)).isFailure) {
-                onComplete?.invoke(Result.failure(JdcrBleCommunicationException("通信错误,可能通道未建立")))
+                onComplete?.invoke(Result.failure(JdcrBleCommunicationException("通信队列已满,或通信渠道已取消")))
             }
         } else {
             onComplete?.invoke(Result.failure(JdcrBleCommunicationException("通信异常,可能已断连")))
@@ -461,14 +461,7 @@ class JdcrBleCommunicatorImpl(
         actionChannelMap.remove(address)
         currentActionMap.remove(address)
         dataMaxSizeMap.remove(address)
-        notifyThrottleMap.iterator().apply {
-            while (hasNext()) {
-                val notify = next()
-                if (notify.key.startsWith(address, true)) {
-                    remove()
-                }
-            }
-        }
+        notifyThrottleMap.entries.removeAll { it.key.startsWith(address, true) }
         pendingActions.iterator().apply {
             while (hasNext()) {
                 val action = next()

@@ -1,4 +1,4 @@
-package com.jdcr.jdcrble.usecase
+package com.jdcr.jdcrblecommon.selftest.usecase
 
 /**
  * 途道/编程猫 BLE 电机控制帧构建。
@@ -80,6 +80,6 @@ object JdcrTudaoControllerUtils {
         0xFD.toByte(),
         0xFC.toByte(),
     ).also {
-        require(it.size == FRAME_SIZE) { "帧长度应为 $FRAME_SIZE，实际 ${it.size}" }
+        require(it.size == FRAME_SIZE) { "帧长度应为 ${FRAME_SIZE}，实际 ${it.size}" }
     }
 }

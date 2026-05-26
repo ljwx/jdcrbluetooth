@@ -1,4 +1,4 @@
-package com.jdcr.jdcrble.usecase
+package com.jdcr.jdcrblecommon.selftest.usecase
 
 import com.jdcr.jdcrble.util.JdcrBleHexUtils.toHexString
 import com.jdcr.jdcrble.util.JdcrBleHexUtils.toUnsignedInt

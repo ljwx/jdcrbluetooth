@@ -1,0 +1,2 @@
+-keep class com.jdcr.jdcrble.available.JdcrBleEnableReceiver { *; }
+-keep class com.jdcr.jdcrble.available.JdcrBleLocationEnableReceiver { *; }

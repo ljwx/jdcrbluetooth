@@ -44,232 +44,252 @@ open class JdcrBleConnectorImpl(
         ConcurrentHashMap<String, MutableStateFlow<JdcrBleConnectState>>()
     private val currentMtuMap = ConcurrentHashMap<String, Int>()
     private var connectTimeoutJobMap = ConcurrentHashMap<String, Job>()
+    private var disconnectTimeoutJobMap = ConcurrentHashMap<String, Job>()
+    private val gattCallbackMap = ConcurrentHashMap<String, BluetoothGattCallback>()
 
-    private fun getGattCallback(): BluetoothGattCallback {
-        return object : BluetoothGattCallback() {
+    private fun getGattCallback(address: String): BluetoothGattCallback {
+        return gattCallbackMap.getOrPut(address) {
+            object : BluetoothGattCallback() {
 
-            override fun onReadRemoteRssi(gatt: BluetoothGatt?, rssi: Int, status: Int) {
-                super.onReadRemoteRssi(gatt, rssi, status)
-                JdcrBleLog.i("读取的信号强度:$rssi")
-            }
-
-            override fun onConnectionStateChange(gatt: BluetoothGatt?, status: Int, newState: Int) {
-                super.onConnectionStateChange(gatt, status, newState)
-                gatt?.device ?: return
-                val device = gatt.device
-                val address = device.address
-
-                if (status != BluetoothGatt.GATT_SUCCESS) {
-                    if (JdcrBlePermissionUtils.checkConnectPermission(context.applicationContext)) {
-                        serverExceptionAndGattDisconnect(device, gatt, status)
-                    }
-                    return
+                override fun onReadRemoteRssi(gatt: BluetoothGatt?, rssi: Int, status: Int) {
+                    super.onReadRemoteRssi(gatt, rssi, status)
+                    JdcrBleLog.i("读取的信号强度:$rssi")
                 }
 
-                when (newState) {
+                override fun onConnectionStateChange(
+                    gatt: BluetoothGatt?,
+                    status: Int,
+                    newState: Int
+                ) {
+                    super.onConnectionStateChange(gatt, status, newState)
+                    gatt?.device ?: return
+                    val device = gatt.device
+                    val address = device.address
 
-                    BluetoothProfile.STATE_CONNECTING -> {
-                        changeDeviceState(address, JdcrBleConnectState.Connecting(address), gatt)
+                    if (status != BluetoothGatt.GATT_SUCCESS) {
+                        if (JdcrBlePermissionUtils.checkConnectPermission(context.applicationContext)) {
+                            serverExceptionAndGattDisconnect(device, gatt, status)
+                        }
+                        return
                     }
 
-                    BluetoothProfile.STATE_CONNECTED -> {
-                        changeDeviceState(address, JdcrBleConnectState.Connected(address), gatt)
-                        gatt.discoverServices()
-                    }
+                    when (newState) {
 
-                    BluetoothProfile.STATE_DISCONNECTING -> {
-                        changeDeviceState(address, JdcrBleConnectState.Disconnecting(address), gatt)
-                    }
+                        BluetoothProfile.STATE_CONNECTING -> {
+                            changeDeviceState(
+                                address,
+                                JdcrBleConnectState.Connecting(address),
+                                gatt
+                            )
+                        }
 
-                    BluetoothProfile.STATE_DISCONNECTED -> {
-                        changeDeviceState(
-                            address,
-                            JdcrBleConnectState.Disconnected(address, status),
-                            gatt
-                        )
+                        BluetoothProfile.STATE_CONNECTED -> {
+                            changeDeviceState(address, JdcrBleConnectState.Connected(address), gatt)
+                            gatt.discoverServices()
+                        }
+
+                        BluetoothProfile.STATE_DISCONNECTING -> {
+                            changeDeviceState(
+                                address,
+                                JdcrBleConnectState.Disconnecting(address),
+                                gatt
+                            )
+                        }
+
+                        BluetoothProfile.STATE_DISCONNECTED -> {
+                            changeDeviceState(
+                                address,
+                                JdcrBleConnectState.Disconnected(address, status),
+                                gatt
+                            )
+                        }
                     }
                 }
-            }
 
-            override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
-                super.onServicesDiscovered(gatt, status)
-                gatt?.device ?: return
-                val device = gatt.device
-                val address = device.address
-                JdcrBleLog.i("onServicesDiscovered:$address")
-                changeDeviceState(address, JdcrBleConnectState.DiscoveredServices(address), gatt)
-                if (status == BluetoothGatt.GATT_SUCCESS) {
-                    val mtu = connectConfigMap[address]?.mtu
-                    val permission =
-                        JdcrBlePermissionUtils.checkConnectPermission(context.applicationContext)
-                    if (permission && mtu != null) {
-                        changeDeviceState(
-                            address,
-                            JdcrBleConnectState.ModifyMtu(address, mtu),
-                            gatt
-                        )
-                        val result = gatt.requestMtu(mtu)
-                        if (!result) {
+                override fun onServicesDiscovered(gatt: BluetoothGatt?, status: Int) {
+                    super.onServicesDiscovered(gatt, status)
+                    gatt?.device ?: return
+                    val device = gatt.device
+                    val address = device.address
+                    JdcrBleLog.i("onServicesDiscovered:$address")
+                    changeDeviceState(
+                        address,
+                        JdcrBleConnectState.DiscoveredServices(address),
+                        gatt
+                    )
+                    if (status == BluetoothGatt.GATT_SUCCESS) {
+                        val mtu = connectConfigMap[address]?.mtu
+                        val permission =
+                            JdcrBlePermissionUtils.checkConnectPermission(context.applicationContext)
+                        if (permission && mtu != null) {
+                            changeDeviceState(
+                                address,
+                                JdcrBleConnectState.ModifyMtu(address, mtu),
+                                gatt
+                            )
+                            val result = gatt.requestMtu(mtu)
+                            if (!result) {
+                                changeDeviceState(
+                                    address,
+                                    JdcrBleConnectState.Ready(address, MTU_DEFAULT_SIZE),
+                                    gatt
+                                )
+                            }
+                            JdcrBleLog.i("请求修改mtu大小:$result,$mtu")
+                        } else {
                             changeDeviceState(
                                 address,
                                 JdcrBleConnectState.Ready(address, MTU_DEFAULT_SIZE),
                                 gatt
                             )
                         }
-                        JdcrBleLog.i("请求修改mtu大小:$result,$mtu")
                     } else {
-                        changeDeviceState(
-                            address,
-                            JdcrBleConnectState.Ready(address, MTU_DEFAULT_SIZE),
-                            gatt
-                        )
+                        JdcrBleLog.w("onServicesDiscovered失败")
+                        serverExceptionAndGattDisconnect(device, gatt, status)
                     }
-                } else {
-                    JdcrBleLog.w("onServicesDiscovered失败")
-                    serverExceptionAndGattDisconnect(device, gatt, status)
                 }
-            }
 
-            override fun onDescriptorWrite(
-                gatt: BluetoothGatt?,
-                descriptor: BluetoothGattDescriptor?,
-                status: Int
-            ) {
-                super.onDescriptorWrite(gatt, descriptor, status)
-                gatt ?: return
-                val characteristic = descriptor?.characteristic
-                characteristic ?: return
+                override fun onDescriptorWrite(
+                    gatt: BluetoothGatt?,
+                    descriptor: BluetoothGattDescriptor?,
+                    status: Int
+                ) {
+                    super.onDescriptorWrite(gatt, descriptor, status)
+                    gatt ?: return
+                    val characteristic = descriptor?.characteristic
+                    characteristic ?: return
 
-                val uuid = characteristic.uuid
-                val success = status == BluetoothGatt.GATT_SUCCESS
-                val descriptorUUID = descriptor.uuid
-                val address = gatt.device?.address ?: return
-                val currentAction = action.getCurrentAction(address)
-                if (currentAction is JdcrBleCommunicatorAction.EnableNotification && uuid == currentAction.characterUUID && descriptorUUID == currentAction.descriptorUUID) {
+                    val uuid = characteristic.uuid
+                    val success = status == BluetoothGatt.GATT_SUCCESS
+                    val descriptorUUID = descriptor.uuid
+                    val address = gatt.device?.address ?: return
+                    val currentAction = action.getCurrentAction(address)
+                    if (currentAction is JdcrBleCommunicatorAction.EnableNotification && uuid == currentAction.characterUUID && descriptorUUID == currentAction.descriptorUUID) {
+                        val service = characteristic.service?.uuid
+                        val isEnable = currentAction.enable
+                        val result = JdcrBleCommunicatorActionResult.Notification(
+                            address,
+                            service,
+                            uuid,
+                            descriptor.uuid,
+                            isEnable,
+                            currentAction.tag
+                        )
+                        action.onActionResult(success, currentAction.key, result)
+                    }
+                }
+
+                private fun onNotification(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    value: ByteArray
+                ) {
+                    val uuid = characteristic.uuid
+                    JdcrBleLog.v("通知服务数据回调: $uuid")
+                    val address = gatt.device.address
                     val service = characteristic.service?.uuid
-                    val isEnable = currentAction.enable
-                    val result = JdcrBleCommunicatorActionResult.Notification(
+                    val result = NotificationData(address, service, uuid, value)
+                    action.onNotification(result)
+                }
+
+                override fun onCharacteristicChanged(
+                    gatt: BluetoothGatt?,
+                    characteristic: BluetoothGattCharacteristic?
+                ) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
+                    gatt ?: return
+                    characteristic ?: return
+                    onNotification(gatt, characteristic, characteristic.value)
+                }
+
+                override fun onCharacteristicChanged(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    value: ByteArray
+                ) {
+                    onNotification(gatt, characteristic, value)
+                }
+
+                override fun onCharacteristicWrite(
+                    gatt: BluetoothGatt?,
+                    characteristic: BluetoothGattCharacteristic?,
+                    status: Int
+                ) {
+                    super.onCharacteristicWrite(gatt, characteristic, status)
+                    JdcrBleLog.d("写数据原始结果:${status == BluetoothGatt.GATT_SUCCESS},${characteristic?.uuid}")
+                    gatt ?: return
+                    characteristic ?: return
+                    val success = status == BluetoothGatt.GATT_SUCCESS
+                    val uuid = characteristic.uuid
+                    val address = gatt.device.address
+                    val service = characteristic.service?.uuid
+                    val key = JdcrBleCommunicatorAction.getWriteKey(address, service, uuid)
+                    val result = JdcrBleCommunicatorActionResult.Write(
                         address,
                         service,
                         uuid,
-                        descriptor.uuid,
-                        isEnable,
-                        currentAction.tag
+                        action.getCurrentAction(address)?.tag
                     )
-                    action.onActionResult(success, currentAction.key, result)
+                    action.onActionResult(success, key, result)
                 }
-            }
 
-            private fun onNotification(
-                gatt: BluetoothGatt,
-                characteristic: BluetoothGattCharacteristic,
-                value: ByteArray
-            ) {
-                val uuid = characteristic.uuid
-                JdcrBleLog.v("通知服务数据回调: $uuid")
-                val address = gatt.device.address
-                val service = characteristic.service?.uuid
-                val result = NotificationData(address, service, uuid, value)
-                action.onNotification(result)
-            }
-
-            override fun onCharacteristicChanged(
-                gatt: BluetoothGatt?,
-                characteristic: BluetoothGattCharacteristic?
-            ) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
-                gatt ?: return
-                characteristic ?: return
-                onNotification(gatt, characteristic, characteristic.value)
-            }
-
-            override fun onCharacteristicChanged(
-                gatt: BluetoothGatt,
-                characteristic: BluetoothGattCharacteristic,
-                value: ByteArray
-            ) {
-                onNotification(gatt, characteristic, value)
-            }
-
-            override fun onCharacteristicWrite(
-                gatt: BluetoothGatt?,
-                characteristic: BluetoothGattCharacteristic?,
-                status: Int
-            ) {
-                super.onCharacteristicWrite(gatt, characteristic, status)
-                JdcrBleLog.d("写数据原始结果:${status == BluetoothGatt.GATT_SUCCESS},${characteristic?.uuid}")
-                gatt ?: return
-                characteristic ?: return
-                val success = status == BluetoothGatt.GATT_SUCCESS
-                val uuid = characteristic.uuid
-                val address = gatt.device.address
-                val service = characteristic.service?.uuid
-                val key = JdcrBleCommunicatorAction.getWriteKey(address, service, uuid)
-                val result = JdcrBleCommunicatorActionResult.Write(
-                    address,
-                    service,
-                    uuid,
-                    action.getCurrentAction(address)?.tag
-                )
-                action.onActionResult(success, key, result)
-            }
-
-            private fun characteristicRead(
-                gatt: BluetoothGatt,
-                characteristic: BluetoothGattCharacteristic,
-                value: ByteArray?,
-                status: Int
-            ) {
-                val uuid = characteristic.uuid
-                val success = status == BluetoothGatt.GATT_SUCCESS
-                val address = gatt.device.address
-                val service = characteristic.service?.uuid
-                val key = JdcrBleCommunicatorAction.getReadKey(address, service, uuid)
-                val result = JdcrBleCommunicatorActionResult.Read(
-                    address,
-                    service,
-                    uuid,
-                    value,
-                    action.getCurrentAction(address)?.tag
-                )
-                action.onActionResult(success, key, result)
-            }
-
-            override fun onCharacteristicRead(
-                gatt: BluetoothGatt?,
-                characteristic: BluetoothGattCharacteristic?,
-                status: Int
-            ) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
-                gatt ?: return
-                characteristic ?: return
-                val value = characteristic?.value
-                characteristicRead(gatt, characteristic, value, status)
-            }
-
-            override fun onCharacteristicRead(
-                gatt: BluetoothGatt,
-                characteristic: BluetoothGattCharacteristic,
-                value: ByteArray,
-                status: Int
-            ) {
-                characteristicRead(gatt, characteristic, value, status)
-            }
-
-            override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
-                super.onMtuChanged(gatt, mtu, status)
-                gatt?.device ?: return
-                val device = gatt.device
-                val address = gatt.device.address
-                currentMtuMap[address] = mtu
-                if (status != BluetoothGatt.GATT_SUCCESS) {
-                    JdcrBleLog.w("修改mtu失败:$status")
+                private fun characteristicRead(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    value: ByteArray?,
+                    status: Int
+                ) {
+                    val uuid = characteristic.uuid
+                    val success = status == BluetoothGatt.GATT_SUCCESS
+                    val address = gatt.device.address
+                    val service = characteristic.service?.uuid
+                    val key = JdcrBleCommunicatorAction.getReadKey(address, service, uuid)
+                    val result = JdcrBleCommunicatorActionResult.Read(
+                        address,
+                        service,
+                        uuid,
+                        value,
+                        action.getCurrentAction(address)?.tag
+                    )
+                    action.onActionResult(success, key, result)
                 }
-                JdcrBleLog.i("实际mtu大小:$mtu")
-                action.setMaxDataSize(address, mtu - MTU_PLACEHOLDER)
-                changeDeviceState(address, JdcrBleConnectState.Ready(address, mtu = mtu), gatt)
-            }
 
+                override fun onCharacteristicRead(
+                    gatt: BluetoothGatt?,
+                    characteristic: BluetoothGattCharacteristic?,
+                    status: Int
+                ) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) return
+                    gatt ?: return
+                    characteristic ?: return
+                    val value = characteristic?.value
+                    characteristicRead(gatt, characteristic, value, status)
+                }
+
+                override fun onCharacteristicRead(
+                    gatt: BluetoothGatt,
+                    characteristic: BluetoothGattCharacteristic,
+                    value: ByteArray,
+                    status: Int
+                ) {
+                    characteristicRead(gatt, characteristic, value, status)
+                }
+
+                override fun onMtuChanged(gatt: BluetoothGatt?, mtu: Int, status: Int) {
+                    super.onMtuChanged(gatt, mtu, status)
+                    gatt?.device ?: return
+                    val device = gatt.device
+                    val address = gatt.device.address
+                    currentMtuMap[address] = mtu
+                    if (status != BluetoothGatt.GATT_SUCCESS) {
+                        JdcrBleLog.w("修改mtu失败:$status")
+                    }
+                    JdcrBleLog.i("实际mtu大小:$mtu")
+                    action.setMaxDataSize(address, mtu - MTU_PLACEHOLDER)
+                    changeDeviceState(address, JdcrBleConnectState.Ready(address, mtu = mtu), gatt)
+                }
+
+            }
         }
     }
 
@@ -286,7 +306,7 @@ open class JdcrBleConnectorImpl(
     }
 
     override fun isConnect(address: String): Boolean {
-        val state = getDeviceStatus(address) ?: JdcrBleConnectState.Void
+        val state = connectStatusMap[address]?.value ?: JdcrBleConnectState.Void
         return state.stateStep > JdcrBleConnectState.INITIAL_STATUS
     }
 
@@ -325,21 +345,25 @@ open class JdcrBleConnectorImpl(
                 return Result.failure(JdcrBleConnectException(it))
             }
         }
+        val statusFlow = connectStatusMap.computeIfAbsent(address) {
+            MutableStateFlow(JdcrBleConnectState.Void)
+        }
         val gatt = device.connectGatt(
             context.applicationContext,
             connectConfigMap[address]?.autoConnect ?: false,
-            getGattCallback()
+            getGattCallback(address),
+            BluetoothDevice.TRANSPORT_LE,
         )
         if (gatt == null) {
             "执行连接后,发现gatt为空,连接失败".let {
                 JdcrBleLog.w(it)
+                connectStatusMap.remove(address)
                 return Result.failure(JdcrBleConnectException(it))
             }
         } else {
             action.setGatt(address, gatt)
             connectTimeout(address, gatt)
-            connectStatusMap[address] = MutableStateFlow(JdcrBleConnectState.Void)
-            return Result.success(getDevicesStatusFlow(address))
+            return Result.success(statusFlow)
         }
     }
 
@@ -350,7 +374,7 @@ open class JdcrBleConnectorImpl(
     private fun connectTimeout(address: String, gatt: BluetoothGatt) {
         connectTimeoutJobMap.remove(address)?.apply { cancel() }
         connectTimeoutJobMap[address] = coroutine.launch {
-            delay(bleConfig.connectTimeoutMills)
+            delay(bleConfig.connectTimeoutMs)
             val state =
                 JdcrBleConnectState.Disconnected(address, 0, true)
             changeDeviceState(address, state, gatt)
@@ -368,7 +392,19 @@ open class JdcrBleConnectorImpl(
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     override fun disconnect(address: String) {
         JdcrBleLog.i("主动断开连接:$address")
+        if (connectStatusMap[address] == null) return
+        disconnectTimeoutJobMap.compute(address) { _, old ->
+            old?.cancel()
+            coroutine.launch {
+                delay(bleConfig.disconnectTimeoutMs)
+                if (getDeviceStatus(address) != null) {
+                    JdcrBleLog.w("断开连接超时,直接断开:$address")
+                    changeDeviceState(address, JdcrBleConnectState.Disconnected(address, 0), getGatt(address))
+                }
+            }
+        }
         connectStatusMap[address]?.let {
+            JdcrBleLog.w("执行断开连接服务")
             getGatt(address)?.disconnect()
             //it.gatt?.close() //直接关闭的话,无法在服务层接收到断连回调
         }
@@ -377,16 +413,13 @@ open class JdcrBleConnectorImpl(
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     override fun disconnectAll() {
         JdcrBleLog.d("主动断开所有连接")
-        connectStatusMap.iterator().apply {
-            while (hasNext()) {
-                disconnect(next().key)
-            }
-        }
+        connectStatusMap.keys.toList().forEach { disconnect(it) }
     }
 
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
     private fun clearGattSource(address: String, gatt: BluetoothGatt?) {
         runCatching {
+            gattCallbackMap.remove(address)
             if (JdcrBlePermissionUtils.checkConnectPermission(context)) {
                 gatt?.disconnect()
                 gatt?.close()
@@ -434,9 +467,19 @@ open class JdcrBleConnectorImpl(
     ) {
         JdcrBleLog.i("触发连接状态变更:${status.desc},$address")
         connectStatusMap[address]?.value = status
-        if (status is JdcrBleConnectState.Disconnected) {
-            clearGattSource(address, gatt)
-            clearDeviceSource(address)
+        when (status) {
+            is JdcrBleConnectState.Ready -> {
+                connectTimeoutJobMap.remove(address)?.cancel()
+            }
+
+            is JdcrBleConnectState.Disconnected -> {
+                clearGattSource(address, gatt)
+                clearDeviceSource(address)
+            }
+
+            else -> {
+
+            }
         }
     }
 
@@ -446,18 +489,16 @@ open class JdcrBleConnectorImpl(
         currentMtuMap.remove(address)
         action.deviceDisconnected(address)
         connectConfigMap.remove(address)
-        connectTimeoutJobMap.remove(address)?.apply { cancel() }
+        connectTimeoutJobMap.remove(address)?.cancel()
+        disconnectTimeoutJobMap.remove(address)?.cancel()
     }
 
     fun release() {
         if (JdcrBlePermissionUtils.checkConnectPermission(context.applicationContext)) {
             disconnectAll()
         }
-        connectStatusMap.clear()
-        connectTimeoutJobMap.forEach { s, job ->
-            job.cancel()
-        }
-        connectTimeoutJobMap.clear()
+        connectStatusMap.keys.toList()
+            .forEach { changeDeviceState(it, JdcrBleConnectState.Disconnected(it, 0), null) }
         connectConfigMap.clear()
         currentMtuMap.clear()
     }
