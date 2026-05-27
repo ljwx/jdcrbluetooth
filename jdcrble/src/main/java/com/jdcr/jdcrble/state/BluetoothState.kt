@@ -1,8 +1,5 @@
 package com.jdcr.jdcrble.state
 
-import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothGatt
-import android.bluetooth.le.ScanResult
 import com.jdcr.jdcrble.core.scanner.ScanResultWrapper
 
 sealed class JdcrBleScanResult(val desc: String) {
@@ -77,12 +74,20 @@ sealed class JdcrBleConnectState(
     data class Disconnected(
         val address: String,
         val status: Int,
-        val isConnectFailed: Boolean = false,
+        val reason: DisconnectReason,
         val timestamp: Long = System.currentTimeMillis(),
     ) : JdcrBleConnectState(
-        "Disconnected,设备已断开,$address,是否连接失败:$isConnectFailed",
+        "Disconnected,设备已断开,$address,reason:${reason.desc}",
         -2
     )
+
+    sealed class DisconnectReason(val desc: String) {
+        object Active : DisconnectReason("主动断开")
+        object ConnectTimeout : DisconnectReason("连接超时")
+        object DisconnectTimeout : DisconnectReason("断开超时")
+        object BluetoothOff : DisconnectReason("系统蓝牙关闭")
+        data class Remote(val status: Int) : DisconnectReason("链路异常:$status")
+    }
 
 }
 

@@ -48,6 +48,7 @@ open class JdcrBleConnectorImpl(
     private var connectTimeoutJobMap = ConcurrentHashMap<String, Job>()
     private var disconnectTimeoutJobMap = ConcurrentHashMap<String, Job>()
     private val gattCallbackMap = ConcurrentHashMap<String, BluetoothGattCallback>()
+    private val activeDisconnectingSet = ConcurrentHashMap.newKeySet<String>()
 
     private fun getGattCallback(address: String): BluetoothGattCallback {
         return gattCallbackMap.getOrPut(address) {
@@ -99,9 +100,16 @@ open class JdcrBleConnectorImpl(
                         }
 
                         BluetoothProfile.STATE_DISCONNECTED -> {
+                            val reason = if (activeDisconnectingSet.remove(address)) {
+                                JdcrBleConnectState.DisconnectReason.Active
+                            } else {
+                                JdcrBleConnectState.DisconnectReason.Remote(
+                                    status
+                                )
+                            }
                             changeDeviceState(
                                 address,
-                                JdcrBleConnectState.Disconnected(address, status),
+                                JdcrBleConnectState.Disconnected(address, status, reason),
                                 gatt
                             )
                         }
@@ -378,7 +386,11 @@ open class JdcrBleConnectorImpl(
         connectTimeoutJobMap[address] = coroutine.launch {
             delay(bleConfig.connectTimeoutMs)
             val state =
-                JdcrBleConnectState.Disconnected(address, 0, true)
+                JdcrBleConnectState.Disconnected(
+                    address,
+                    0,
+                    JdcrBleConnectState.DisconnectReason.ConnectTimeout
+                )
             changeDeviceState(address, state, gatt)
         }
     }
@@ -414,6 +426,7 @@ open class JdcrBleConnectorImpl(
     override fun disconnect(address: String) {
         JdcrBleLog.i("主动断开连接:$address")
         if (connectStatusMap[address] == null) return
+        activeDisconnectingSet.add(address)
         disconnectTimeoutJobMap.compute(address) { _, old ->
             old?.cancel()
             coroutine.launch {
@@ -422,7 +435,11 @@ open class JdcrBleConnectorImpl(
                     JdcrBleLog.w("断开连接超时,直接断开:$address")
                     changeDeviceState(
                         address,
-                        JdcrBleConnectState.Disconnected(address, 0),
+                        JdcrBleConnectState.Disconnected(
+                            address,
+                            0,
+                            JdcrBleConnectState.DisconnectReason.DisconnectTimeout
+                        ),
                         getGatt(address)
                     )
                 }
@@ -462,7 +479,11 @@ open class JdcrBleConnectorImpl(
             val address = entry.key
             changeDeviceState(
                 address,
-                JdcrBleConnectState.Disconnected(address, 0),
+                JdcrBleConnectState.Disconnected(
+                    address,
+                    0,
+                    JdcrBleConnectState.DisconnectReason.BluetoothOff
+                ),
                 getGatt(address)
             )
         }
@@ -480,7 +501,11 @@ open class JdcrBleConnectorImpl(
         JdcrBleLog.d("蓝牙服务异常,上一个状态:${state?.desc}")
         changeDeviceState(
             address,
-            JdcrBleConnectState.Disconnected(device.address, status),
+            JdcrBleConnectState.Disconnected(
+                device.address,
+                status,
+                JdcrBleConnectState.DisconnectReason.Remote(status)
+            ),
             gatt
         )
     }
@@ -516,6 +541,7 @@ open class JdcrBleConnectorImpl(
         connectConfigMap.remove(address)
         connectTimeoutJobMap.remove(address)?.cancel()
         disconnectTimeoutJobMap.remove(address)?.cancel()
+        activeDisconnectingSet.remove(address)
     }
 
     fun release() {
@@ -523,7 +549,17 @@ open class JdcrBleConnectorImpl(
             disconnectAll()
         }
         connectStatusMap.keys.toList()
-            .forEach { changeDeviceState(it, JdcrBleConnectState.Disconnected(it, 0), null) }
+            .forEach {
+                changeDeviceState(
+                    it,
+                    JdcrBleConnectState.Disconnected(
+                        it,
+                        0,
+                        JdcrBleConnectState.DisconnectReason.Active
+                    ),
+                    null
+                )
+            }
         connectConfigMap.clear()
         currentMtuMap.clear()
     }
