@@ -129,6 +129,8 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
         }
     }
 
+    fun isConnect(address: String) = bleCore.isConnect(address)
+
     @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
     fun connect(
         address: String,
