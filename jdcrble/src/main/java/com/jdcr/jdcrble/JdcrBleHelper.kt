@@ -13,17 +13,18 @@ import com.jdcr.jdcrble.config.JdcrBleScanConfig
 import com.jdcr.jdcrble.core.JdcrBleCore
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
+import com.jdcr.jdcrble.data.JdcrBleServiceInfo
 import com.jdcr.jdcrble.state.JdcrBleAvailableState
 import com.jdcr.jdcrble.state.JdcrBleConnectState
 import com.jdcr.jdcrble.state.JdcrBleScanResult
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
 import com.jdcr.jdcrble.util.JdcrBleUtils
-import com.jdcr.jdcrlog.JdcrLog
 import com.jdcr.jdcrpermission.JdcrPermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.util.UUID
 
 class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBleConfig()) {
 
@@ -142,6 +143,18 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
         config: JdcrBleConnectConfig? = null
     ): Result<StateFlow<JdcrBleConnectState>?> {
         return bleCore.connect(device, config)
+    }
+
+    fun getServiceStructure(address: String): List<JdcrBleServiceInfo>? {
+        if (!JdcrBlePermissionUtils.checkConnectPermission(applicationContext)) {
+            JdcrBleLog.w("没有连接权限,不获取服务列表")
+            return null
+        }
+        return bleCore.getServiceStructure(address)
+    }
+
+    fun getServiceUuids(address: String): List<UUID>? {
+        return getServiceStructure(address)?.map { it.uuid }?.distinct()
     }
 
     fun disconnect(address: String) {

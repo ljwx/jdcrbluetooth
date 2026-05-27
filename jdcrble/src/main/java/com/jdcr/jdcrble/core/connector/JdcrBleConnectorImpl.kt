@@ -12,13 +12,15 @@ import android.content.Context
 import android.os.Build
 import androidx.annotation.RequiresPermission
 import com.jdcr.jdcrble.config.JdcrBleConfig
+import com.jdcr.jdcrble.config.JdcrBleConnectConfig
+import com.jdcr.jdcrble.config.MTU_DEFAULT_SIZE
+import com.jdcr.jdcrble.config.MTU_PLACEHOLDER
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorImpl
 import com.jdcr.jdcrble.core.communicator.NotificationData
-import com.jdcr.jdcrble.config.JdcrBleConnectConfig
-import com.jdcr.jdcrble.config.MTU_DEFAULT_SIZE
-import com.jdcr.jdcrble.config.MTU_PLACEHOLDER
+import com.jdcr.jdcrble.data.JdcrBleCharacterInfo
+import com.jdcr.jdcrble.data.JdcrBleServiceInfo
 import com.jdcr.jdcrble.exception.JdcrBleConnectException
 import com.jdcr.jdcrble.state.JdcrBleConnectState
 import com.jdcr.jdcrble.util.JdcrBleLog
@@ -385,6 +387,25 @@ open class JdcrBleConnectorImpl(
         return getGatt(address)?.device
     }
 
+    override fun getServiceStructure(address: String): List<JdcrBleServiceInfo>? {
+        val state = getDeviceStatus(address) ?: return null
+        if (state !is JdcrBleConnectState.Ready) return null
+        return getGatt(address)?.services?.map { service ->
+            JdcrBleServiceInfo(
+                service.uuid,
+                service.characteristics.map { character ->
+                    JdcrBleCharacterInfo(
+                        character.uuid,
+                        character.properties,
+                        character.descriptors.map {
+                            it.uuid
+                        }
+                    )
+                }
+            )
+        }
+    }
+
     override fun getFinalMtu(address: String): Int? {
         return currentMtuMap[address]
     }
@@ -399,7 +420,11 @@ open class JdcrBleConnectorImpl(
                 delay(bleConfig.disconnectTimeoutMs)
                 if (getDeviceStatus(address) != null) {
                     JdcrBleLog.w("断开连接超时,直接断开:$address")
-                    changeDeviceState(address, JdcrBleConnectState.Disconnected(address, 0), getGatt(address))
+                    changeDeviceState(
+                        address,
+                        JdcrBleConnectState.Disconnected(address, 0),
+                        getGatt(address)
+                    )
                 }
             }
         }

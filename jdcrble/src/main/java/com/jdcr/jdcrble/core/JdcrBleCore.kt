@@ -9,8 +9,8 @@ import androidx.annotation.RequiresPermission
 import com.jdcr.jdcrble.config.JdcrBleConfig
 import com.jdcr.jdcrble.config.JdcrBleConnectConfig
 import com.jdcr.jdcrble.config.JdcrBleScanConfig
-import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorAction
+import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorActionResult
 import com.jdcr.jdcrble.core.communicator.JdcrBleCommunicatorImpl
 import com.jdcr.jdcrble.core.communicator.NotificationData
 import com.jdcr.jdcrble.core.connector.JdcrBleConnector
@@ -18,6 +18,7 @@ import com.jdcr.jdcrble.core.connector.JdcrBleConnectorImpl
 import com.jdcr.jdcrble.core.scanner.JdcrBleScanner
 import com.jdcr.jdcrble.core.scanner.JdcrBleScannerImpl
 import com.jdcr.jdcrble.core.scanner.ScanResultWrapper
+import com.jdcr.jdcrble.data.JdcrBleServiceInfo
 import com.jdcr.jdcrble.exception.JdcrBleAvailableException
 import com.jdcr.jdcrble.state.JdcrBleConnectState
 import com.jdcr.jdcrble.state.JdcrBleScanResult
@@ -145,6 +146,9 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
     }
 
     override fun getDevice(address: String): BluetoothDevice? = connector?.getDevice(address)
+
+    override fun getServiceStructure(address: String): List<JdcrBleServiceInfo>? =
+        connector?.getServiceStructure(address)
 
     override fun getFinalMtu(address: String): Int? = connector?.getFinalMtu(address)
 
