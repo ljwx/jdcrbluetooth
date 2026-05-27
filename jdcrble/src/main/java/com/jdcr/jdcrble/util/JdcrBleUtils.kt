@@ -61,7 +61,7 @@ object JdcrBleUtils {
             return JdcrBleAvailableState.BleDisable
         }
 
-        if (isNeedLocationFeature(location.enableLocationFeature)) {
+        if (isNeedLocationFeature(location.forceLocationFeature)) {
             if (!isLocationEnable(context).getOrElse { false }) {
                 return JdcrBleAvailableState.LocationDisable
             }

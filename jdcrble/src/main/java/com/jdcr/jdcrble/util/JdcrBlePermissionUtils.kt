@@ -9,13 +9,6 @@ import com.jdcr.jdcrble.config.JdcrLocationConfig
 
 object JdcrBlePermissionUtils {
 
-    private fun getLocationPermissions(): Array<String> {
-        return arrayOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.ACCESS_COARSE_LOCATION
-        )
-    }
-
     private fun getBluetoothPermissions(): Array<String> {
         return arrayOf(
             Manifest.permission.BLUETOOTH_SCAN,
@@ -24,29 +17,16 @@ object JdcrBlePermissionUtils {
         )
     }
 
-    fun getAllPermissions(): Array<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            getBluetoothPermissions()
-        } else {
-            // Android 11- 蓝牙必须的定位权限
-            getLocationPermissions()
-        }
-    }
+//    fun getAllPermissions(): Array<String> {
+//        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+//            getBluetoothPermissions()
+//        } else {
+//            // Android 11- 蓝牙必须的定位权限
+//            getLocationPermissions()
+//        }
+//    }
 
-    fun getScanPermission(): Array<String>? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            arrayOf(Manifest.permission.BLUETOOTH_SCAN)
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        } else {
-            null
-        }
-    }
-
-    fun getConnectPermission(): String? {
+    private fun getConnectPermission(): String? {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             //Android 12+：检查BLUETOOTH_CONNECT权限
             Manifest.permission.BLUETOOTH_CONNECT
@@ -60,6 +40,10 @@ object JdcrBlePermissionUtils {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_SCAN) ==
                     PackageManager.PERMISSION_GRANTED
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val hasFine = ContextCompat.checkSelfPermission(
                 context, Manifest.permission.ACCESS_FINE_LOCATION
@@ -94,12 +78,9 @@ object JdcrBlePermissionUtils {
         return false
     }
 
-    fun isMissLocationPermission(forceFineLocation: Boolean, permissions: Array<String>): Boolean {
+    fun isMissLocationPermission(permissions: Array<String>): Boolean {
         permissions.forEach {
             if (it == Manifest.permission.ACCESS_FINE_LOCATION) {
-                return true
-            }
-            if (!forceFineLocation && it == Manifest.permission.ACCESS_COARSE_LOCATION) {
                 return true
             }
         }
@@ -118,14 +99,7 @@ object JdcrBlePermissionUtils {
                 context,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
-            val hasCoarse = ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-            if (location.forceFineLocation && !hasFine) {
-                locationList.add(Manifest.permission.ACCESS_FINE_LOCATION)
-            } else if (!hasFine && !hasCoarse) {
-                // 通常申请精度高的即可
+            if (!hasFine) {
                 locationList.add(Manifest.permission.ACCESS_FINE_LOCATION)
                 locationList.add(Manifest.permission.ACCESS_COARSE_LOCATION)
             }

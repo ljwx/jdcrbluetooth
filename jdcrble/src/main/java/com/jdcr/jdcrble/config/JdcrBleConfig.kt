@@ -10,8 +10,7 @@ const val MTU_PLACEHOLDER = 3
 
 data class JdcrLocationConfig(
     var forceLocationPermission: Boolean = false,
-    var forceFineLocation: Boolean = false,
-    var enableLocationFeature: Boolean = true
+    var forceLocationFeature: Boolean = true
 )
 
 

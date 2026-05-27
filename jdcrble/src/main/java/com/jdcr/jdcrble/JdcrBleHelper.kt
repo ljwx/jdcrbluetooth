@@ -45,7 +45,7 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     fun init(): JdcrBleHelper {
         JdcrBleLog.i("初始化蓝牙帮助类状态")
-        if (JdcrBleUtils.isNeedLocationFeature(config.location.enableLocationFeature)) {
+        if (JdcrBleUtils.isNeedLocationFeature(config.location.forceLocationFeature)) {
             locationEnableReceiver.register {
                 changeAvailableState()
             }
@@ -76,15 +76,6 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
     fun isBleReady(): Boolean {
         JdcrBleLog.i("可用状态是否可用:${availableState.value.desc}")
         return availableState.value is JdcrBleAvailableState.Ready
-    }
-
-    fun requestAllPermission(
-        activity: FragmentActivity,
-        callback: ((allGranted: Boolean, Map<String, Boolean>) -> Unit)?
-    ) {
-        JdcrBleLog.i("触发请求所有权限")
-        val permissions = JdcrBlePermissionUtils.getAllPermissions()
-        JdcrPermissionUtils.request(activity, permissions, callback)
     }
 
     fun requestMissPermissions(

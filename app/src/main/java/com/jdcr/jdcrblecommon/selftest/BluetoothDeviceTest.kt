@@ -25,7 +25,6 @@ object BluetoothDeviceTest {
     fun init(context: Context) {
         val config = JdcrBleConfig().apply {
             location.forceLocationPermission = true
-            location.forceFineLocation = true
         }
         manager = JdcrBleHelper(context, config = config).init()
         scop.launch {
