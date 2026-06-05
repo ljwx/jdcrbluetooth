@@ -22,9 +22,11 @@ import com.jdcr.jdcrble.state.JdcrBleScanResult
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
 import com.jdcr.jdcrble.util.JdcrBleUtils
+import com.jdcr.jdcrpermission.ExplainScope
 import com.jdcr.jdcrpermission.JdcrPermission
 import com.jdcr.jdcrpermission.handler.JdcrOpenActionHandler
 import com.jdcr.jdcrpermission.result.JdcrPermissionResult
+import com.jdcr.jdcrpermission.util.JdcrPermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -86,6 +88,8 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     fun requestMissPermissions(
         activity: FragmentActivity,
+        before: (ExplainScope.(deniedList: List<String>) -> Unit)?,
+        after: (ExplainScope.(foreverDeniedList: List<String>) -> Unit)?,
         callback: ((JdcrPermissionResult) -> Unit)
     ) {
         JdcrBleLog.i("触发请求缺失的所有权限")
@@ -96,17 +100,14 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
         }
         val permissions =
             JdcrBlePermissionUtils.getMissPermission(applicationContext, config.location)
+        before?.let { permissionManager?.onExplainBeforeRequest(it) }
+        after?.let { permissionManager?.onExplainAfterDenied(it) }
         permissionManager?.permissions(permissions.toList())
         permissionManager?.request(callback)
     }
 
     fun openPermissionSetting(activity: FragmentActivity, callback: (() -> Unit)) {
-        JdcrOpenActionHandler(
-            activity,
-            activity.activityResultRegistry,
-            JdcrBleUtils.getIntentAction(activity, Settings.ACTION_APPLICATION_DETAILS_SETTINGS),
-            callback
-        ).start()
+        JdcrPermissionUtils.openAppSettings(activity, callback)
     }
 
     fun openBleEnableSetting(activity: FragmentActivity, callback: (() -> Unit)) {
