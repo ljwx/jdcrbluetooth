@@ -3,6 +3,8 @@ package com.jdcr.jdcrble
 import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import androidx.annotation.RequiresPermission
 import androidx.fragment.app.FragmentActivity
 import com.jdcr.jdcrble.available.JdcrBleEnableReceiver
@@ -20,7 +22,9 @@ import com.jdcr.jdcrble.state.JdcrBleScanResult
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
 import com.jdcr.jdcrble.util.JdcrBleUtils
-import com.jdcr.jdcrpermission.JdcrPermissionUtils
+import com.jdcr.jdcrpermission.JdcrPermission
+import com.jdcr.jdcrpermission.handler.JdcrOpenActionHandler
+import com.jdcr.jdcrpermission.result.JdcrPermissionResult
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +36,8 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     private val bleEnableReceiver by lazy { JdcrBleEnableReceiver(applicationContext) }
     private val locationEnableReceiver by lazy { JdcrBleLocationEnableReceiver(applicationContext) }
+
+    private var permissionManager: JdcrPermission? = null
 
     private var availableState =
         MutableStateFlow(
@@ -80,29 +86,45 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     fun requestMissPermissions(
         activity: FragmentActivity,
-        callback: ((allGranted: Boolean, Map<String, Boolean>) -> Unit)?
+        callback: ((JdcrPermissionResult) -> Unit)
     ) {
         JdcrBleLog.i("触发请求缺失的所有权限")
-        JdcrPermissionUtils.request(
-            activity,
-            JdcrBlePermissionUtils.getMissPermission(
-                applicationContext,
-                config.location
-            ),
-            callback
-        )
+        if (permissionManager == null) {
+            synchronized(this) {
+                permissionManager ?: JdcrPermission.with(activity).also { permissionManager = it }
+            }
+        }
+        val permissions =
+            JdcrBlePermissionUtils.getMissPermission(applicationContext, config.location)
+        permissionManager?.permissions(permissions.toList())
+        permissionManager?.request(callback)
     }
 
     fun openPermissionSetting(activity: FragmentActivity, callback: (() -> Unit)) {
-        JdcrPermissionUtils.openAppSettings(activity, callback)
+        JdcrOpenActionHandler(
+            activity,
+            activity.activityResultRegistry,
+            JdcrBleUtils.getIntentAction(activity, Settings.ACTION_APPLICATION_DETAILS_SETTINGS),
+            callback
+        ).start()
     }
 
     fun openBleEnableSetting(activity: FragmentActivity, callback: (() -> Unit)) {
-        JdcrPermissionUtils.openBluetoothSettings(activity, callback)
+        JdcrOpenActionHandler(
+            activity,
+            activity.activityResultRegistry,
+            JdcrBleUtils.getIntentAction(activity, Settings.ACTION_BLUETOOTH_SETTINGS),
+            callback
+        ).start()
     }
 
     fun openLocationEnableSetting(activity: FragmentActivity, callback: (() -> Unit)) {
-        JdcrPermissionUtils.openLocationSettings(activity, callback)
+        JdcrOpenActionHandler(
+            activity,
+            activity.activityResultRegistry,
+            JdcrBleUtils.getIntentAction(activity, Settings.ACTION_LOCATION_SOURCE_SETTINGS),
+            callback
+        ).start()
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)

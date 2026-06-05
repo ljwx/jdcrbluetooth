@@ -43,7 +43,7 @@ dependencies {
     api("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
 
     api("com.github.ljwx:jdcrlog:1.2.5")
-    api("com.github.ljwx:jdcrpermissions:0.3.1-SNAPSHOT")
+    api("com.github.ljwx:jdcrpermissions:0.9.0-SNAPSHOT")
 }
 
 afterEvaluate {

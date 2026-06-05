@@ -46,7 +46,7 @@ class MainActivity : FragmentActivity() {
                         )
                         Button(onClick = {
                             helper.getHelper()
-                                .requestMissPermissions(this@MainActivity) { allGranted, _ ->
+                                .requestMissPermissions(this@MainActivity) { result ->
                                     helper.getHelper().changeAvailableState()
                                 }
                         }) {

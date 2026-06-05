@@ -3,8 +3,11 @@ package com.jdcr.jdcrble.util
 import android.bluetooth.BluetoothManager
 import android.bluetooth.le.ScanResult
 import android.content.Context
+import android.content.Intent
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.location.LocationManagerCompat
 import com.jdcr.jdcrble.config.JdcrLocationConfig
 import com.jdcr.jdcrble.state.JdcrBleAvailableState
@@ -68,6 +71,16 @@ object JdcrBleUtils {
         }
 
         return JdcrBleAvailableState.Ready
+    }
+
+    fun getIntentAction(context: Context, action: String): Intent {
+        return if (action == Settings.ACTION_APPLICATION_DETAILS_SETTINGS) {
+            Intent(action).apply {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
+        } else {
+            Intent(action)
+        }
     }
 
 }
