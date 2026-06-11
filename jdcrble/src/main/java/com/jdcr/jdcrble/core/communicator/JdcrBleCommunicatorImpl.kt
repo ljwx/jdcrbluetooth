@@ -165,6 +165,10 @@ class JdcrBleCommunicatorImpl(
         }
     }
 
+    fun getGattAll(): List<BluetoothGatt> {
+        return gatts.values.toList()
+    }
+
     fun getGatt(address: String): BluetoothGatt? {
         return gatts[address]
     }

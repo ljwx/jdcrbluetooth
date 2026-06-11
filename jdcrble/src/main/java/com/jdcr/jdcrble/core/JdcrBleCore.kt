@@ -147,6 +147,8 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
 
     override fun getDevice(address: String): BluetoothDevice? = connector?.getDevice(address)
 
+    override fun getConnectDevices(): List<BluetoothDevice>? = connector?.getConnectDevices()
+
     override fun getServiceStructure(address: String): List<JdcrBleServiceInfo>? =
         connector?.getServiceStructure(address)
 

@@ -399,6 +399,10 @@ open class JdcrBleConnectorImpl(
         return getGatt(address)?.device
     }
 
+    override fun getConnectDevices(): List<BluetoothDevice>? {
+        return action.getGattAll().map { it.device }
+    }
+
     override fun getServiceStructure(address: String): List<JdcrBleServiceInfo>? {
         val state = getDeviceStatus(address) ?: return null
         if (state !is JdcrBleConnectState.Ready) return null

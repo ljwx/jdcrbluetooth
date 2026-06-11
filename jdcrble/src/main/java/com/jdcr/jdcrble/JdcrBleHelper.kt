@@ -259,6 +259,8 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     fun getDevice(address: String) = bleCore.getDevice(address)
 
+    fun getConnectDevice() = bleCore.getConnectDevices()
+
     fun getNotificationDataFlow() = bleCore.getNotificationDataFlow()
 
     fun onRelease() {

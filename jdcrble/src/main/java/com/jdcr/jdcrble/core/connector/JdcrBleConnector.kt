@@ -22,6 +22,8 @@ interface JdcrBleConnector {
 
     fun getDevice(address: String): BluetoothDevice?
 
+    fun getConnectDevices(): List<BluetoothDevice>?
+
     fun getServiceStructure(address: String): List<JdcrBleServiceInfo>?
 
     fun getFinalMtu(address: String): Int?
