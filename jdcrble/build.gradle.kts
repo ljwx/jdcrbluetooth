@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
+    alias(jdcr.plugins.android.library)
+    alias(jdcr.plugins.kotlin.android)
     `maven-publish`
 }
 
@@ -35,15 +35,10 @@ android {
 
 dependencies {
 
-    val kotVersion = "1.6.0"
-    api("androidx.core:core-ktx:$kotVersion")
-    // 2. 引入协程 (建议使用 1.6.4)
-    val coroutinesVersion = "1.6.4"
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-core:$coroutinesVersion")
-    api("org.jetbrains.kotlinx:kotlinx-coroutines-android:$coroutinesVersion")
+    api(jdcr.jdcr.dev.base)
+    api(jdcr.jdcr.log)
+    api(jdcr.jdcr.permission)
 
-    api("com.github.ljwx.jdcrlog:jdcrlog-android:1.3.1-SNAPSHOT")
-    api("com.github.ljwx:jdcrpermissions:0.9.1-SNAPSHOT")
 }
 
 afterEvaluate {
