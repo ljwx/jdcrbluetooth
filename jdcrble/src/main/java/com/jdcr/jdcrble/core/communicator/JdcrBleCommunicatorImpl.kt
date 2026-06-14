@@ -438,14 +438,13 @@ class JdcrBleCommunicatorImpl(
                         (props and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0
             }
                 .forEach {
-                    enableNotification(
-                        gatt,
+                    sendAction(
                         JdcrBleCommunicatorAction.EnableNotification(
                             gatt.device.address,
                             service.uuid,
                             it.uuid,
                             false
-                        )
+                        ), false, null
                     )
                 }
         }

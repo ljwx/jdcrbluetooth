@@ -324,6 +324,10 @@ object BluetoothDeviceTest {
         }
     }
 
+    fun disableAllNotify(address: String) {
+        manager.stopAllNotify(address)
+    }
+
     fun getScanResult(address: String) = manager.getScanResult(address)
 
 }
