@@ -257,6 +257,12 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     }
 
+    fun stopAllNotify(address: String) {
+        if (JdcrBlePermissionUtils.checkConnectPermission(applicationContext)) {
+            bleCore.stopAllNotify(address)
+        }
+    }
+
     fun getDevice(address: String) = bleCore.getDevice(address)
 
     fun getConnectDevice() = bleCore.getConnectDevices()

@@ -6,6 +6,7 @@ import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import androidx.annotation.RequiresPermission
+import com.jdcr.jdcrbase.coroutine.JdcrSafeCoroutineScope
 import com.jdcr.jdcrble.config.JdcrBleConfig
 import com.jdcr.jdcrble.config.JdcrBleConnectConfig
 import com.jdcr.jdcrble.config.JdcrBleScanConfig
@@ -31,6 +32,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 class JdcrBleCore(private val context: Context, private val config: JdcrBleConfig) : JdcrBle {
 
@@ -39,9 +41,9 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
     private val coroutineExceptionHandler = CoroutineExceptionHandler { _, e ->
         JdcrBleLog.e("蓝牙协程收到异常", e)
     }
-    private val rootJob = SupervisorJob()
-    private val coroutine: CoroutineScope =
-        CoroutineScope(Dispatchers.IO + rootJob + coroutineExceptionHandler)
+    private val coroutine = JdcrSafeCoroutineScope(Dispatchers.IO, tag = "jdcrBle") {
+        JdcrBleLog.e("蓝牙库协程发生异常", it)
+    }
 
     private var scanner: JdcrBleScannerImpl? = null
     private val communicator by lazy {
@@ -179,12 +181,19 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
         communicator.sendAction(action, inMainThread, onComplete)
     }
 
+    @RequiresPermission(Manifest.permission.BLUETOOTH_CONNECT)
+    fun stopAllNotify(address: String) {
+        coroutine.launch {
+            communicator.stopAllNotify(address)
+        }
+    }
+
     override fun getNotificationDataFlow(): SharedFlow<NotificationData> {
         return communicator.getNotificationDataFlow()
     }
 
     override fun release() {
-        rootJob.cancelChildren()
+        coroutine.cancelChildren()
         scanner?.release()
         connector?.release()
         communicator.release()

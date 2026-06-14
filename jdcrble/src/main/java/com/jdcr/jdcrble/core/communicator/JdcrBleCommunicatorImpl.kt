@@ -428,6 +428,30 @@ class JdcrBleCommunicatorImpl(
         }
     }
 
+    @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT)
+    internal suspend fun stopAllNotify(address: String) {
+        val gatt = gatts[address] ?: return
+        gatt.services?.forEach { service ->
+            service.characteristics.filter { ch ->
+                val props = ch.properties
+                (props and BluetoothGattCharacteristic.PROPERTY_NOTIFY) != 0 ||
+                        (props and BluetoothGattCharacteristic.PROPERTY_INDICATE) != 0
+            }
+                .forEach {
+                    enableNotification(
+                        gatt,
+                        JdcrBleCommunicatorAction.EnableNotification(
+                            gatt.device.address,
+                            service.uuid,
+                            it.uuid,
+                            false
+                        )
+                    )
+                }
+        }
+
+    }
+
     override fun getNotificationDataFlow(): SharedFlow<NotificationData> {
         return notification
     }
