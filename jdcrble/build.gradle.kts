@@ -37,7 +37,7 @@ dependencies {
 
     api(jdcr.jdcr.dev.base)
     api(jdcr.jdcr.log)
-    api(jdcr.jdcr.permission)
+    api("com.github.ljwx:JdcrPermissions:1.0.0")
 
     testImplementation(libs.junit)
 

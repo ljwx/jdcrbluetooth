@@ -21,9 +21,9 @@ import com.jdcr.jdcrble.state.JdcrBleScanResult
 import com.jdcr.jdcrble.util.JdcrBleLog
 import com.jdcr.jdcrble.util.JdcrBlePermissionUtils
 import com.jdcr.jdcrble.util.JdcrBleUtils
-import com.jdcr.jdcrpermission.ExplainScope
+import com.jdcr.jdcrpermission.BeforePermissionRequestScope
 import com.jdcr.jdcrpermission.JdcrPermission
-import com.jdcr.jdcrpermission.handler.JdcrOpenActionHandler
+import com.jdcr.jdcrpermission.PermanentlyDeniedScope
 import com.jdcr.jdcrpermission.result.JdcrPermissionResult
 import com.jdcr.jdcrpermission.util.JdcrPermissionUtils
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -85,18 +85,18 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     fun requestMissPermissions(
         activity: FragmentActivity,
-        before: (ExplainScope.(deniedList: List<String>) -> Unit)?,
-        after: (ExplainScope.(foreverDeniedList: List<String>) -> Unit)?,
+        before: (BeforePermissionRequestScope.() -> Unit)?,
+        after: (PermanentlyDeniedScope.() -> Unit)?,
         callback: ((JdcrPermissionResult) -> Unit)
     ) {
         JdcrBleLog.i("触发请求缺失的所有权限")
         val permissionManager = JdcrPermission.with(activity)
         val permissions =
             JdcrBlePermissionUtils.getMissPermission(applicationContext, config.location)
-        before?.let { permissionManager?.onExplainBeforeRequest(it) }
-        after?.let { permissionManager?.onExplainAfterDenied(it) }
-        permissionManager?.permissions(permissions.toList())
-        permissionManager?.request(callback)
+        before?.let { permissionManager.onExplainBeforeRequest(it) }
+        after?.let { permissionManager.onPermanentlyDenied(it) }
+        permissionManager.permissions(permissions.toList())
+        permissionManager.request(callback)
     }
 
     fun openPermissionSetting(activity: FragmentActivity, callback: (() -> Unit)) {
@@ -104,21 +104,19 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
     }
 
     fun openBleEnableSetting(activity: FragmentActivity, callback: (() -> Unit)) {
-        JdcrOpenActionHandler(
+        JdcrPermissionUtils.launchIntent(
             activity,
-            activity.activityResultRegistry,
             JdcrBleUtils.getIntentAction(activity, Settings.ACTION_BLUETOOTH_SETTINGS),
             callback
-        ).start()
+        )
     }
 
     fun openLocationEnableSetting(activity: FragmentActivity, callback: (() -> Unit)) {
-        JdcrOpenActionHandler(
+        JdcrPermissionUtils.launchIntent(
             activity,
-            activity.activityResultRegistry,
             JdcrBleUtils.getIntentAction(activity, Settings.ACTION_LOCATION_SOURCE_SETTINGS),
             callback
-        ).start()
+        )
     }
 
     @RequiresPermission(Manifest.permission.BLUETOOTH_SCAN)

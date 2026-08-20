@@ -49,7 +49,7 @@ class MainActivity : FragmentActivity() {
                                 .requestMissPermissions(this@MainActivity, {
                                     proceed()
                                 }, {
-                                    proceed()
+                                    openSettings()
                                 }) { result ->
                                     helper.getHelper().changeAvailableState()
                                 }
