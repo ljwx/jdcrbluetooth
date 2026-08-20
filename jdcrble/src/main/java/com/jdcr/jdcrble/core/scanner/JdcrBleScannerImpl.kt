@@ -53,6 +53,12 @@ open class JdcrBleScannerImpl(
                 this@JdcrBleScannerImpl.onScanResult(callbackType, result)
             }
 
+            override fun onBatchScanResults(results: List<ScanResult>?) {
+                super.onBatchScanResults(results)
+                if (!isScanning) return
+                results?.forEach { scanResultChannel?.trySend(it) }
+            }
+
             override fun onScanFailed(errorCode: Int) {
                 super.onScanFailed(errorCode)
                 this@JdcrBleScannerImpl.onScanFailed(errorCode)
@@ -113,19 +119,23 @@ open class JdcrBleScannerImpl(
         }
     }
 
+    @Synchronized
     @androidx.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_SCAN)
     override fun startScan(config: JdcrBleScanConfig?): Result<SharedFlow<JdcrBleScanResult>> {
         JdcrBleLog.i("触发蓝牙扫描")
-
-        this.scanConfig = config ?: this.scanConfig
 
         fun startScanCountdown() {
             scanTimeoutJob = coroutine.launch {
                 delay(scanConfig.timeoutFinish)
                 if (isScanning) {
                     JdcrBleLog.w("扫描倒计时结束,停止扫描")
-                    scanner.stopScan(scanCallback)
-                    scanFinish(JdcrBleScanResult.Finish)
+                    try {
+                        scanner.stopScan(scanCallback)
+                    } catch (e: Exception) {
+                        JdcrBleLog.e("扫描超时停止异常", e)
+                    } finally {
+                        scanFinish(JdcrBleScanResult.Finish)
+                    }
                 }
             }
         }
@@ -135,9 +145,10 @@ open class JdcrBleScannerImpl(
                 JdcrBleLog.w("正在扫描中,直接返回")
                 return@runCatching scanResultFlow.asSharedFlow()
             }
+            isScanning = true
+            this.scanConfig = config ?: this.scanConfig
             startScanTask()
             JdcrBleLog.i("执行系统扫描")
-            isScanning = true
             scanner.startScan(scanConfig.scanFilters, scanConfig.settings, scanCallback)
             startScanCountdown()
             scanResultFlow.asSharedFlow()
@@ -155,7 +166,6 @@ open class JdcrBleScannerImpl(
     private fun onScanResult(callbackType: Int, result: ScanResult?) {
         if (!isScanning) return
         result ?: return
-        scanResultChannel ?: return
         scanResultChannel?.trySend(result)
     }
 
@@ -217,7 +227,10 @@ open class JdcrBleScannerImpl(
         scanFinish(JdcrBleScanResult.Finish)
     }
 
+    @Synchronized
     private fun scanFinish(result: JdcrBleScanResult) {
+        if (!isScanning) return
+        isScanning = false
         JdcrBleLog.i("扫描结束了,清理资源")
         scanTimeoutJob?.cancel()
         scanTimeoutJob = null
@@ -227,11 +240,8 @@ open class JdcrBleScannerImpl(
         scanResultChannel = null
         handleScanResultJob?.cancel()
         handleScanResultJob = null
-        coroutine.launch(scanResultSerial) {
-            isScanning = false
-            scanResultMap.clear()
-            scanResultFlow.tryEmit(result)
-        }
+        scanResultMap.clear()
+        scanResultFlow.tryEmit(result)
     }
 
     override fun release() {

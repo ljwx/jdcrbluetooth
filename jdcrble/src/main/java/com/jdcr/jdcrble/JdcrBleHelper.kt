@@ -3,7 +3,6 @@ package com.jdcr.jdcrble
 import android.Manifest
 import android.bluetooth.BluetoothDevice
 import android.content.Context
-import android.content.Intent
 import android.provider.Settings
 import androidx.annotation.RequiresPermission
 import androidx.fragment.app.FragmentActivity
@@ -38,8 +37,6 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     private val bleEnableReceiver by lazy { JdcrBleEnableReceiver(applicationContext) }
     private val locationEnableReceiver by lazy { JdcrBleLocationEnableReceiver(applicationContext) }
-
-    private var permissionManager: JdcrPermission? = null
 
     private var availableState =
         MutableStateFlow(
@@ -93,11 +90,7 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
         callback: ((JdcrPermissionResult) -> Unit)
     ) {
         JdcrBleLog.i("触发请求缺失的所有权限")
-        if (permissionManager == null) {
-            synchronized(this) {
-                permissionManager ?: JdcrPermission.with(activity).also { permissionManager = it }
-            }
-        }
+        val permissionManager = JdcrPermission.with(activity)
         val permissions =
             JdcrBlePermissionUtils.getMissPermission(applicationContext, config.location)
         before?.let { permissionManager?.onExplainBeforeRequest(it) }
@@ -269,14 +262,14 @@ class JdcrBleHelper(context: Context, private val config: JdcrBleConfig = JdcrBl
 
     fun getNotificationDataFlow() = bleCore.getNotificationDataFlow()
 
-    fun onRelease() {
+    fun release() {
         bleEnableReceiver.close()
         locationEnableReceiver.close()
         bleCore.release()
     }
 
-    fun onDestroy() {
-        onRelease()
+    fun destroy() {
+        release()
     }
 
 }

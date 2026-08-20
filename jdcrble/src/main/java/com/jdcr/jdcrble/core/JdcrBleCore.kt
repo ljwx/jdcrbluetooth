@@ -76,9 +76,10 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
         if (scanner == null) {
             synchronized(this) {
                 if (scanner == null) {
+                    val bluetoothLeScanner = adapter.bluetoothLeScanner ?: return null
                     scanner = JdcrBleScannerImpl(
                         context.applicationContext,
-                        adapter.bluetoothLeScanner,
+                        bluetoothLeScanner,
                         coroutine,
                     )
                     JdcrBleLog.i("初始化scanner:$scanner")
@@ -193,10 +194,10 @@ class JdcrBleCore(private val context: Context, private val config: JdcrBleConfi
     }
 
     override fun release() {
-        coroutine.cancelChildren()
         scanner?.release()
         connector?.release()
         communicator.release()
+        coroutine.cancelChildren()
     }
 
 }

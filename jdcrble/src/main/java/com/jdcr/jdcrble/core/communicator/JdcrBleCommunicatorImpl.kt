@@ -28,6 +28,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeoutException
+import kotlin.time.Duration.Companion.milliseconds
 
 data class JdcrBleActionWrapper(
     val action: JdcrBleCommunicatorAction,
@@ -103,7 +104,7 @@ class JdcrBleCommunicatorImpl(
                         }
                         val result: Result<JdcrBleCommunicatorActionResult> = when (action) {
                             is JdcrBleCommunicatorAction.Read -> {
-                                val result = withTimeoutOrNull(config.timeoutMills) {
+                                val result = withTimeoutOrNull(config.timeoutMills.milliseconds) {
                                     JdcrBleLog.i("执行指令,${action.log}")
                                     read(gatt, action)
                                 }
@@ -111,7 +112,7 @@ class JdcrBleCommunicatorImpl(
                             }
 
                             is JdcrBleCommunicatorAction.EnableNotification -> {
-                                val result = withTimeoutOrNull(config.timeoutMills) {
+                                val result = withTimeoutOrNull(config.timeoutMills.milliseconds) {
                                     JdcrBleLog.i("执行指令,${action.log}")
                                     enableNotification(gatt, action)
                                 }
@@ -119,7 +120,7 @@ class JdcrBleCommunicatorImpl(
                             }
 
                             is JdcrBleCommunicatorAction.Write -> {
-                                val result = withTimeoutOrNull(config.timeoutMills) {
+                                val result = withTimeoutOrNull(config.timeoutMills.milliseconds) {
                                     JdcrBleLog.i("执行指令,${action.log}")
                                     write(gatt, action)
                                 }

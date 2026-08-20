@@ -50,6 +50,8 @@ open class JdcrBleConnectorImpl(
     private val gattCallbackMap = ConcurrentHashMap<String, BluetoothGattCallback>()
     private val activeDisconnectingSet = ConcurrentHashMap.newKeySet<String>()
 
+    private val connectLock = Any()
+
     private fun getGattCallback(address: String): BluetoothGattCallback {
         return gattCallbackMap.getOrPut(address) {
             object : BluetoothGattCallback() {
@@ -341,40 +343,50 @@ open class JdcrBleConnectorImpl(
         config: JdcrBleConnectConfig?
     ): Result<StateFlow<JdcrBleConnectState>?> {
         val address = device.address
-        if (config != null) {
-            this.connectConfigMap[address] = config
-        }
         JdcrBleLog.i("触发设备连接:${address}")
-        if (isConnect(address)) {
-            JdcrBleLog.i("设备已连接:${address},直接返回结果")
-            return Result.success(getDevicesStatusFlow(address))
-        }
-        if (isConnectLimit()) {
-            "连接已达上限,无法执行连接:${address}".let {
-                JdcrBleLog.w(it)
-                return Result.failure(JdcrBleConnectException(it))
+        val statusFlow = synchronized(connectLock) {
+            connectStatusMap[address]?.let {
+                JdcrBleLog.i("设备正在连接或已经连接:$address")
+                return Result.success(it)
+            }
+
+            if (isConnectLimit()) {
+                JdcrBleLog.w("连接已达上限,无法执行连接:${address}")
+                return Result.failure(JdcrBleConnectException("连接已达上限:$address"))
+            }
+
+            config?.let { connectConfigMap[address] = it }
+
+            MutableStateFlow<JdcrBleConnectState>(
+                JdcrBleConnectState.Connecting(address)
+            ).also {
+                connectStatusMap[address] = it
             }
         }
-        val statusFlow = connectStatusMap.computeIfAbsent(address) {
-            MutableStateFlow(JdcrBleConnectState.Void)
+        val gatt = runCatching {
+            device.connectGatt(
+                context.applicationContext,
+                connectConfigMap[address]?.autoConnect ?: false,
+                getGattCallback(address),
+                BluetoothDevice.TRANSPORT_LE,
+            )
+        }.getOrElse {
+            connectStatusMap.remove(address, statusFlow)
+            connectConfigMap.remove(address)
+            JdcrBleLog.w("执行连接异常,${address}", it)
+            return Result.failure(JdcrBleConnectException("执行连接异常:${it.message}"))
         }
-        val gatt = device.connectGatt(
-            context.applicationContext,
-            connectConfigMap[address]?.autoConnect ?: false,
-            getGattCallback(address),
-            BluetoothDevice.TRANSPORT_LE,
-        )
         if (gatt == null) {
-            "执行连接后,发现gatt为空,连接失败".let {
+            "执行连接,gatt返回空,连接失败".let {
                 JdcrBleLog.w(it)
-                connectStatusMap.remove(address)
+                connectStatusMap.remove(address, statusFlow)
+                connectConfigMap.remove(address)
                 return Result.failure(JdcrBleConnectException(it))
             }
-        } else {
-            action.setGatt(address, gatt)
-            connectTimeout(address, gatt)
-            return Result.success(statusFlow)
         }
+        action.setGatt(address, gatt)
+        connectTimeout(address, gatt)
+        return Result.success(statusFlow)
     }
 
     private fun getGatt(address: String): BluetoothGatt? {
@@ -549,21 +561,17 @@ open class JdcrBleConnectorImpl(
     }
 
     fun release() {
-        if (JdcrBlePermissionUtils.checkConnectPermission(context.applicationContext)) {
-            disconnectAll()
+        connectStatusMap.keys.toList().forEach { address ->
+            changeDeviceState(
+                address,
+                JdcrBleConnectState.Disconnected(
+                    address,
+                    0,
+                    JdcrBleConnectState.DisconnectReason.Active
+                ),
+                getGatt(address)
+            )
         }
-        connectStatusMap.keys.toList()
-            .forEach {
-                changeDeviceState(
-                    it,
-                    JdcrBleConnectState.Disconnected(
-                        it,
-                        0,
-                        JdcrBleConnectState.DisconnectReason.Active
-                    ),
-                    null
-                )
-            }
         connectConfigMap.clear()
         currentMtuMap.clear()
     }

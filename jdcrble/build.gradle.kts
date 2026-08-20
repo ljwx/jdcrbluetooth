@@ -39,6 +39,8 @@ dependencies {
     api(jdcr.jdcr.log)
     api(jdcr.jdcr.permission)
 
+    testImplementation(libs.junit)
+
 }
 
 afterEvaluate {
